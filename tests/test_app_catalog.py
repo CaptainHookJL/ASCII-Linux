@@ -7,7 +7,8 @@ import tempfile
 import unittest
 from unittest import mock
 
-from desktop.apps.catalog import AppCatalog, MAX_APPS, MAX_FILE_BYTES
+from desktop.apps.catalog import (Application, AppCatalog, MAX_APPS, MAX_COMMAND_CHARS,
+                                  MAX_FILE_BYTES, validate_install_command)
 
 
 class AppCatalogTests(unittest.TestCase):
@@ -260,6 +261,110 @@ class AppCatalogTests(unittest.TestCase):
             self.catalog.remove('absent')
         self.assertEqual(self.path.read_bytes(), original)
         self.assertEqual(self.catalog.entries, [saved])
+
+    def test_prepare_validates_launcher_without_creating_files_or_adding_entries(self):
+        self.catalog.load()
+        entries = self.catalog.entries
+        prepared = self.catalog.prepare_add('Downloaded tool', './tool "literal argument"',
+                                            'A tool I downloaded')
+        self.assertEqual(prepared.command, ('./tool', 'literal argument'))
+        self.assertEqual(self.catalog.entries, [])
+        self.assertIs(self.catalog.entries, entries)
+        self.assertFalse(self.path.parent.exists())
+
+    def test_prepare_leaves_existing_file_and_entries_unchanged_until_commit(self):
+        saved = self.catalog.add('Saved', 'saved')
+        original = self.path.read_bytes()
+        entries = self.catalog.entries
+        prepared = self.catalog.prepare_add('New tool', 'new-tool --option')
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(self.catalog.entries, [saved])
+        self.assertIs(self.catalog.entries, entries)
+        self.assertEqual(self.catalog.commit_add(prepared), prepared)
+        self.assertEqual(AppCatalog(self.path).load(), [saved, prepared])
+
+    def test_invalid_launch_inputs_cannot_be_prepared(self):
+        cases = [(' ', 'app', ''), ('App', '"" argument', ''),
+                 ('App', 'app "unfinished', ''), ('App', 'app', 'bad\x00description')]
+        for name, command, description in cases:
+            with self.subTest(command=command, name=name), self.assertRaises(ValueError):
+                self.catalog.prepare_add(name, command, description)
+        self.assertEqual(self.catalog.entries, [])
+        self.assertFalse(self.path.exists())
+
+    def test_commit_revalidates_application_fields_and_does_not_write_invalid_records(self):
+        invalid = [None, {'name': 'App'}, Application('', 'App', ('app',)),
+                   Application('1', ' ', ('app',)), Application('1', 'App', ()),
+                   Application('1', 'App', None), Application('1', 'App', ('app', '\n')),
+                   Application('1', 'App', ('app',), 'bad\x00description')]
+        for entry in invalid:
+            with self.subTest(entry=entry), self.assertRaises(ValueError):
+                self.catalog.commit_add(entry)
+        self.assertEqual(self.catalog.entries, [])
+        self.assertFalse(self.path.exists())
+
+    def test_commit_refuses_application_id_collision_without_changing_data(self):
+        saved = self.catalog.add('Saved', 'saved')
+        original = self.path.read_bytes()
+        colliding = Application(saved.id, 'Replacement', ('replacement',))
+        with self.assertRaisesRegex(ValueError, 'already exists'):
+            self.catalog.commit_add(colliding)
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(self.catalog.entries, [saved])
+
+    def test_commit_refuses_external_changes_after_preparation(self):
+        prepared = self.catalog.prepare_add('Prepared', 'prepared')
+        competing = AppCatalog(self.path).add('Competing', 'competing')
+        original = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'changed outside'):
+            self.catalog.commit_add(prepared)
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(AppCatalog(self.path).load(), [competing])
+        self.assertEqual(self.catalog.entries, [])
+
+    def test_preparation_refuses_stale_catalog_before_installation_can_begin(self):
+        self.catalog.add('Saved', 'saved')
+        AppCatalog(self.path).add('Competing', 'competing')
+        original = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'changed outside'):
+            self.catalog.prepare_add('New tool', 'new-tool')
+        self.assertEqual(self.path.read_bytes(), original)
+
+    def test_prepare_and_commit_check_entry_capacity_before_writing(self):
+        self.write_records([self.record(str(index)) for index in range(MAX_APPS)])
+        self.catalog.load()
+        original = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'at most'):
+            self.catalog.prepare_add('New', 'new')
+        with self.assertRaisesRegex(ValueError, 'at most'):
+            self.catalog.commit_add(Application('new-id', 'New', ('new',)))
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(len(self.catalog.entries), MAX_APPS)
+
+    def test_prepare_and_commit_check_serialized_size_before_writing(self):
+        self.write_records([self.record()])
+        self.catalog.load()
+        original = self.path.read_bytes()
+        with mock.patch('desktop.apps.catalog.MAX_FILE_BYTES', len(original) + 30):
+            with self.assertRaisesRegex(ValueError, 'size limit'):
+                self.catalog.prepare_add('New', 'new')
+            with self.assertRaisesRegex(ValueError, 'size limit'):
+                self.catalog.commit_add(Application('new-id', 'New', ('new',)))
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(len(self.catalog.entries), 1)
+
+    def test_install_command_preserves_bash_pipeline_and_quotes_for_review(self):
+        command = 'curl -fsS "https://example.invalid/app installer.sh" | sh'
+        self.assertEqual(validate_install_command('  ' + command + '  '), command)
+        self.assertEqual(validate_install_command('x' * MAX_COMMAND_CHARS), 'x' * MAX_COMMAND_CHARS)
+        self.assertFalse(self.path.exists())
+
+    def test_install_command_rejects_empty_multiline_controls_and_oversize_input(self):
+        for command in [None, '', '  ', 'curl URL\nsh installer', 'curl URL\r',
+                        'curl URL\x00', 'curl\tURL', 'x' * (MAX_COMMAND_CHARS + 1)]:
+            with self.subTest(command=str(command)[:50]), self.assertRaises(ValueError):
+                validate_install_command(command)
+        self.assertFalse(self.path.exists())
 
 
 if __name__ == '__main__':

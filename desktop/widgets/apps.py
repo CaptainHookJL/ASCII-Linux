@@ -45,7 +45,11 @@ class AppsSection:
         self.error = ''
 
     def add(self, name, command, description=''):
-        entry = self.catalog.add(name, command, description)
+        entry = self.catalog.prepare_add(name, command, description)
+        return self.add_prepared(entry)
+
+    def add_prepared(self, entry):
+        self.catalog.commit_add(entry)
         self.table.update(self.catalog.entries)
         self.table.set_query('')
         self.table.selected = next(i for i, app in enumerate(self.entries) if app.id == entry.id)
@@ -107,7 +111,7 @@ class AppsSection:
         desktop.text(height - 5, 3,
                      fit('Search: ' + (self.query or '[all apps]'), available, desktop.width),
                      curses.A_DIM)
-        desktop.text(height - 4, 2, 'N Add | D Remove | R Reload | / Search | Enter Open')
+        desktop.text(height - 4, 2, 'N Add | I Install | D Remove | R Reload | / Search')
 
     def render_compact(self, desktop, width):
         entry = self.selected_entry

@@ -14,12 +14,13 @@ import unittest
 
 
 class Terminal:
-    def __init__(self, home, ascii_only=False):
+    def __init__(self, home, ascii_only=False, controlling=False):
         self.master, slave = pty.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 28, 110, 0, 0))
         self.process = subprocess.Popen(
             ['python3', '-m', 'desktop.main'] + (['--ascii'] if ascii_only else []),
             stdin=slave, stdout=slave, stderr=slave, start_new_session=True,
+            preexec_fn=(lambda: fcntl.ioctl(slave, termios.TIOCSCTTY, 0)) if controlling else None,
             env=dict(os.environ, TERM='xterm-256color', HOME=str(home), LANG='C.UTF-8',
                      XDG_DATA_HOME=str(Path(home) / '.local' / 'share')))
         os.close(slave)

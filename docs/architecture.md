@@ -11,11 +11,25 @@ external changes. It does not install or execute applications.
 `desktop/widgets/apps.py` renders the desktop Apps panel and full Apps page using
 the shared table selection/filtering model. It follows terminal size, sorts
 entries alphabetically by name, and leaves application startup to the desktop controller.
-The desktop controller handles adding/removing launchers and runs their commands
-without an implicit shell, with the user's home as the working directory, while
-suspending and restoring curses. Built-in tools keep their F1 and function-key
-routes and are separate from the initially empty user Apps list.
+The desktop controller handles adding/removing launchers and runs their launch
+commands without an implicit shell, with the user's home as the working
+directory, while suspending and restoring curses. Install from command (`I`)
+collects a Bash download/install command and a separate launch argument list.
+It validates the launcher and catalog before execution, shows a scrollable
+review of both commands, and requires Y to proceed. The installer runs as
+`/bin/bash -o pipefail -c` in the user's home. Only an exit status of 0 permits
+saving the launcher; failure or interruption is reported after restoring the
+desktop and does not undo files changed by the installer. Built-in tools keep
+their F1 and function-key routes and are separate from the initially empty user
+Apps list. There is no default Brave entry, automatic installer, or `.desktop`
+discovery. Native graphical apps need an existing graphical session; the live
+image supplies no X11/Wayland server. Brave installation and GUI execution have
+not been validated in this cloud environment.
 `tests/test_apps_workflows.py` exercises the Apps section in real terminals.
+`tests/test_install_controller.py` checks preflight validation, review cancellation,
+installer status handling and launcher commits. `tests/test_app_install_workflows.py`
+uses real terminals and `curl` against a local in-process HTTP server to check
+downloads, pipeline failure, scrollable review, cancellation and interruption.
 `desktop/apps/file_manager.py` implements directory navigation, name filtering,
 file/directory mutations, and safe previews. It uses Linux libc's `renameat2`
 with NOREPLACE to publish copies and move directories without racing another

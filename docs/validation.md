@@ -2,11 +2,12 @@
 
 Executed in a Debian 13 amd64 cloud container:
 
-- All 126 unittest tests passed, with no skips or disabled cases: 42 earlier
+- All 150 unittest tests passed, with no skips or disabled cases: 42 earlier
   file/editor/system/widget/terminal checks; 18 editor-history tests; 18 process
   tests; 13 network tests; two polling tests; four system-view regressions;
-  three extended real-terminal workflows; 21 user-app catalog tests; four
-  Apps-section workflows; and one Unicode Apps-panel regression.
+  three extended real-terminal workflows; 32 user-app catalog tests; four
+  Apps-section workflows; one Unicode Apps-panel regression; eight installation
+  controller tests; and five download/install terminal workflows.
 - File tests exercise copy/move/rename/mkdir/name filtering/deletion, source
   preservation after failures, collision races, staging cleanup, symbolic links,
   directory trees, local FIFO moves, simulated cross-device move fallback, and
@@ -44,6 +45,19 @@ Executed in a Debian 13 amd64 cloud container:
   60-by-16 terminal modes passed. Manual rendering checks covered empty and
   populated catalogs at 30 supported terminal sizes with both logos intact;
   a regression checks that wide Unicode descriptions stay inside the panel.
+- Installation checks validate launch commands and catalog limits before running
+  anything, preserve the catalog when installation fails or is cancelled, and
+  recheck external edits before committing a successful install's launcher.
+  Real-terminal tests download a script with curl from an in-process localhost
+  HTTP server, register and execute it, and reject a failed HTTP pipeline even
+  when its final shell command exits zero. They cover review scrolling/resizing,
+  ignored approval below the supported terminal size, cancellation, and Ctrl+C
+  interruption while preserving and saving an existing editor buffer. No remote
+  installer, sudo command or host package change was executed by these tests.
+- The Brave example uses its documented install/launch commands and requires an
+  existing graphical Linux session. Read-only requests to the official website
+  and installer URL returned HTTP 403 in this environment. Brave installation,
+  repository/package setup, and native GUI startup remain **unverified** here.
 - `python3 -m desktop.main --check` and build/integration shell syntax checks passed.
 
 ISO build was previously attempted and stopped at the root prerequisite. This

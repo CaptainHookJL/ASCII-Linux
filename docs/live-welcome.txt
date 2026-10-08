@@ -5,11 +5,21 @@ F11: processes. F12: network information. Built-in tools stay in the F1 menu.
 Apps: A from the desktop or F1 menu opens your saved launchers, initially empty.
 In full Apps, N adds a name, command and optional description; D removes a
 launcher after confirmation without uninstalling its program; R reloads.
+I installs from a pasted Bash command, then saves a separate launch command.
+Review both commands; Y runs, N/Esc cancels. Installer runs in your home with
+pipefail and may ask for sudo. Only exit 0 adds the launcher; failed/interrupted
+commands may leave changed files or packages, which are not rolled back.
 Arrows/Tab select, Enter launches, / searches names/descriptions/commands,
 Esc returns to desktop. Example command: python3 /home/jacob/my-app/main.py
-Commands run in your home without an implicit shell; quote paths with spaces.
+Launch commands run in your home without a shell; quote paths with spaces.
 Scripts need executable permission or an interpreter; use bash -lc explicitly
-for shell syntax. Apps registers launchers; it does not install or scan programs.
+for shell syntax. N only registers; I installs after review. Nothing installs
+automatically, and Apps does not scan .desktop files.
+Brave official instructions: https://brave.com/linux/
+I installer: curl -fsS https://dl.brave.com/install.sh | sh
+Launch command: brave-browser. On a host, install curl if missing:
+sudo apt install curl. Brave needs an existing graphical Linux session.
+The text-only ISO has no X11/Wayland server; Brave installation/GUI is unvalidated.
 Launchers save in ${XDG_DATA_HOME:-~/.local/share}/ascii-linux/apps.json;
 relative XDG paths use ~/.local/share. JSON entries have id, name, command
 (argument list) and description; adding through the Apps UI is recommended.

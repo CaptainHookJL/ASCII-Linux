@@ -16,6 +16,7 @@ procps
 iproute2
 network-manager
 ca-certificates
+curl
 firmware-linux
 firmware-iwlwifi
 firmware-realtek

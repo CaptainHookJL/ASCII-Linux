@@ -19,7 +19,9 @@ python3 -m desktop.main --check    # noninteractive Linux capability check
 python3 -m unittest discover -s tests -v
 ```
 
-No pip packages are required. Use a terminal of at least 60 columns by 16 rows.
+No pip packages are required. The installation workflow tests require `curl`
+and use only a local HTTP server; on Debian/Ubuntu, run `sudo apt install curl`
+if it is missing. Use a terminal of at least 60 columns by 16 rows.
 F1 opens the launcher, F2 opens Files, F3 launches Bash, F4 opens system information,
 F9 opens or resumes the text editor, F10 opens the power menu, F11 opens Processes,
 and F12 opens Network. These built-in tools remain available through F1. Press `A`
@@ -37,24 +39,52 @@ or a compact Apps strip in narrower terminals. Use arrows or Tab to select a
 saved app and Enter to launch it. `A` opens the full Apps page from the desktop
 or F1 menu; Esc returns to the desktop.
 
-The easiest way to register an app is to open Apps and press `N`. Enter a name,
-command and optional description. For example, name it `My app` and enter:
+To add an app you already have, open Apps and press `N`. Enter a name,
+launch command and optional description. For example, name it `My app` and enter:
 
 ```sh
 python3 /home/jacob/my-app/main.py
 ```
 
-On the full Apps page, `D` asks to remove the selected saved launcher; it does
-not uninstall the program. `R` reloads saved entries. `/` searches names,
-descriptions and commands; empty input clears the search. Registration does
-not install packages or discover `.desktop` files automatically. Install the
-program separately through Bash or Debian's package tools.
+To download and install an app, press `I` on the full Apps page. Enter the app
+name, paste its download/install command, then enter its launch command and an
+optional description. Apps checks the launcher before running anything. The
+scrollable review shows the exact installation and launch commands; press `Y`
+to run, or `N`/Esc to cancel. The installation command runs in Bash with
+`pipefail`, from your home directory, in the terminal. It may ask for your sudo
+password. The desktop returns when it finishes and saves the launcher only after
+exit status 0. Failed or interrupted installations add no launcher; files or
+packages changed by the command are retained.
 
-Commands are split into arguments with POSIX `shlex` and run from your home
+`D` asks to remove the selected saved launcher; it does not uninstall the
+program. `R` reloads saved entries. `/` searches names, descriptions and commands;
+empty input clears the search. Apps starts empty and does not install anything
+automatically or discover `.desktop` files. `N` only registers a launch command;
+use `I` or Debian's tools in Bash when installation is needed.
+
+Launch commands are split into arguments with POSIX `shlex` and run from your home
 directory without an implicit shell. Quote paths containing spaces, for example
 `python3 "/home/jacob/My App/main.py"`. Scripts need an executable bit or an
 interpreter command such as `python3` or `bash`. If you need shell syntax,
 explicitly use a command such as `bash -lc 'your command here'`.
+
+For **Brave**, use the commands from the [official Linux installation page](https://brave.com/linux/)
+in the `I` flow:
+
+| Prompt | Value |
+| --- | --- |
+| Name | `Brave` |
+| Download/install command | `curl -fsS https://dl.brave.com/install.sh \| sh` |
+| Launch command | `brave-browser` |
+| Description | `Brave web browser` (optional) |
+
+The live-image configuration includes `curl`. If it is missing on an existing
+Debian/Ubuntu host, install it first with `sudo apt install curl`. Brave needs
+an existing graphical Linux session: run the ASCII desktop in that session's
+terminal to launch its native browser window. The text-only ISO and this cloud
+environment provide no X11/Wayland display server. Actual Brave installation and
+GUI startup have not been validated here. Brave is not installed or added to
+Apps by default.
 
 Launchers persist in `${XDG_DATA_HOME:-~/.local/share}/ascii-linux/apps.json`;
 a relative `XDG_DATA_HOME` is ignored in favor of `~/.local/share`. The file is

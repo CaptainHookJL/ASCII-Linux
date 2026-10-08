@@ -2,12 +2,14 @@
 import curses
 import getpass
 from pathlib import Path
+import shlex
 import socket
 import subprocess
 import time
 import unicodedata
 
 from desktop.apps.file_manager import FileManager, preview
+from desktop.apps.catalog import validate_install_command
 from desktop.apps.text_editor import TextEditor
 from desktop.core.system_views import SystemApps
 from desktop.utils.jobs import FileJob
@@ -178,7 +180,8 @@ class Desktop:
                  'system': 'System information', 'preview': 'File preview', 'help': 'Help / About',
                  'power': 'Power / Logout', 'editor': 'Text editor',
                  'processes': 'Processes', 'process_details': 'Process inspection',
-                 'network': 'Network', 'network_details': 'Network details'}.get(self.page, self.page)
+                 'network': 'Network', 'network_details': 'Network details',
+                 'install_review': 'Review app install'}.get(self.page, self.page)
         if self.page == 'editor' and self.editor:
             title = f'Text editor: {self.editor.path or "Untitled"}' + (' *' if self.editor.dirty else '')
         self.frame(title)
@@ -239,6 +242,8 @@ class Desktop:
             self.system_apps.render(self.page, h, w)
         else:
             lines = self.view_lines()
+            if self.page == 'install_review':
+                self.offset = min(self.offset, max(0, len(lines) - (h - 8)))
             for y, line in enumerate(lines[self.offset:self.offset + h - 8], 4):
                 self.text(y, 3, line)
         app_error = self.apps.error if self.page in ('apps', 'home') else ''
@@ -247,8 +252,10 @@ class Desktop:
                   if self.page == 'editor' else
                   'A Apps | F1 Menu | F2 Files | F3 Shell | F4 System | F9 Editor'
                   if self.page == 'home' else
-                  'Arrows/Tab Select | Esc Desktop'
+                  'Arrows/Tab Select | Enter Open | Esc Desktop'
                   if self.page == 'apps' else
+                  'Y Run | N/Esc Cancel | Arrows/Page Up/Down Scroll'
+                  if self.page == 'install_review' else
                   'F1 Menu | F2 Files | F3 Shell | F4 System | F9 Editor | F10 Power')
         self.text(h - 1, 0, footer)
         if self.dialog:
@@ -268,8 +275,11 @@ class Desktop:
         try:
             result = subprocess.run(command, check=False, cwd=cwd)
             self.message = f'{command[0]} exited with status {result.returncode}'
+            return result.returncode
         except OSError as error:
             self.message = str(error)
+        except KeyboardInterrupt:
+            self.message = f'{command[0]} interrupted'
         finally:
             curses.reset_prog_mode()
             self.screen.timeout(200)
@@ -338,7 +348,8 @@ class Desktop:
                           'F11 Processes, F12 Network (also available in F1 Menu).',
                           'Home: Apps section uses arrows/Tab and Enter; A browses all.',
                           'Apps contains your added apps; system tools are in F1 Menu.',
-                          'Apps: N add, D remove launcher, R reload, / search.',
+                          'Apps: N add existing, I install from command, D remove launcher.',
+                          'Apps: R reload, / search; install command is reviewed first.',
                           'Apps: arrows/Tab select, Enter run, Esc desktop.',
                           'Files: Enter previews; E edits; Backspace goes to parent.',
                           'H toggles hidden files; R refreshes; / filters filenames.',
@@ -492,6 +503,62 @@ class Desktop:
         entry = self.apps.add(name, command, description)
         self.message = 'App added: ' + entry.name
 
+    def review_install(self, entry, command):
+        previous = self.page, self.lines, self.offset, self.message
+        self.page, self.offset, self.message = 'install_review', 0, ''
+        self.lines = [f'App: {entry.name}', 'Download/install command:', command, '',
+                      'Launch command after installation:', shlex.join(entry.command), '',
+                      'The install command runs in Bash from your home directory.',
+                      'It may download files, install packages and ask for sudo.',
+                      'The launcher is saved only if the command succeeds.',
+                      'Press Y to run, or N/Esc to cancel. Scroll to review all lines.']
+        try:
+            while True:
+                self.tick()
+                self.render()
+                try:
+                    key = self.screen.get_wch()
+                except curses.error:
+                    continue
+                height, width = self.screen.getmaxyx()
+                if key in ('y', 'Y') and height >= 16 and width >= 60:
+                    return True
+                if key in ('n', 'N', '\x1b', '\x11'):
+                    return False
+                self.scroll_lines(key)
+        finally:
+            self.page, self.lines, self.offset, self.message = previous
+
+    def install_app(self):
+        name = self.prompt('Install app: name')
+        if name is None or not name.strip():
+            return
+        command = self.prompt('Download/install command (runs in Bash)')
+        if command is None:
+            return
+        command = validate_install_command(command)
+        launch = self.prompt('Launch command after installation')
+        if launch is None:
+            return
+        description = self.prompt('App description (optional)')
+        if description is None:
+            return
+        entry = self.apps.catalog.prepare_add(name, launch, description)
+        if not self.review_install(entry, command):
+            self.message = 'Install cancelled'
+            return
+        result = self.external(['/bin/bash', '-o', 'pipefail', '-c', command], cwd=Path.home())
+        if result != 0:
+            failure = f'Install failed (exit {result})' if result is not None else self.message
+            self.message = failure + '; launcher not added'
+            return
+        try:
+            self.apps.add_prepared(entry)
+        except (OSError, ValueError) as error:
+            self.message = f'Install succeeded; launcher not saved: {error}'
+            return
+        self.message = 'Installed and added: ' + entry.name
+
     def handle_apps(self, key):
         if key in (curses.KEY_UP, curses.KEY_LEFT, curses.KEY_DOWN, curses.KEY_RIGHT):
             self.apps.move(-1 if key in (curses.KEY_UP, curses.KEY_LEFT) else 1)
@@ -505,6 +572,8 @@ class Desktop:
                 self.apps.set_query(query)
         elif self.page == 'apps' and key in ('n', 'N'):
             self.add_app()
+        elif self.page == 'apps' and key in ('i', 'I'):
+            self.install_app()
         elif self.page == 'apps' and key in ('d', 'D'):
             entry = self.apps.selected_entry
             if entry and self.confirm(f'Remove launcher for {entry.name}? The app files will be kept.'):
@@ -579,7 +648,7 @@ class Desktop:
     def view_lines(self):
         if self.page == 'system':
             return information()
-        if self.page not in ('process_details', 'network_details'):
+        if self.page not in ('process_details', 'network_details', 'install_review'):
             return self.lines
         # Preserve every address/argument; narrow terminals can scroll wrapped lines.
         width = max(1, self.screen.getmaxyx()[1] - 6)

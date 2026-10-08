@@ -47,6 +47,11 @@ def _string(value, label, limit, allow_empty=False):
     return value
 
 
+def validate_install_command(command):
+    """Validate a printable Bash command for review, without running it."""
+    return _string(command, 'Download/install command', MAX_COMMAND_CHARS).strip()
+
+
 def _application(record):
     if not isinstance(record, dict) or set(record) - {'id', 'name', 'command', 'description'}:
         raise ValueError('Apps catalog contains an invalid application record.')
@@ -135,7 +140,7 @@ class AppCatalog:
             raise ValueError('Apps catalog changed outside the desktop; reload before changing it.')
         return current
 
-    def _save(self, entries):
+    def _encode(self, entries):
         if len(entries) > MAX_APPS:
             raise ValueError(f'Apps catalog supports at most {MAX_APPS} applications.')
         records = _records(entries)
@@ -146,6 +151,10 @@ class AppCatalog:
         data = (json.dumps(records, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
         if len(data) > MAX_FILE_BYTES:
             raise ValueError('Apps catalog exceeds the 1 MiB size limit.')
+        return validated, data
+
+    def _save(self, entries):
+        validated, data = self._encode(entries)
         current = self._check_current()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = None
@@ -176,7 +185,8 @@ class AppCatalog:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
 
-    def add(self, name, command, description=''):
+    def prepare_add(self, name, command, description=''):
+        """Validate a prospective launcher without writing it to the catalog."""
         self._ensure_loaded()
         name = _string(name, 'Application name', 128).strip()
         command = _string(command, 'Command', MAX_COMMAND_CHARS)
@@ -195,8 +205,29 @@ class AppCatalog:
             raise ValueError('Cannot expand the executable path: unknown home directory.') from error
         entry = _application({'id': uuid.uuid4().hex, 'name': name, 'command': arguments,
                               'description': description})
-        self._save(self.entries + [entry])
+        self._check_current()
+        if len(self.entries) >= MAX_APPS:
+            raise ValueError(f'Apps catalog supports at most {MAX_APPS} applications.')
+        self._encode(self.entries + [entry])
         return entry
+
+    def commit_add(self, entry):
+        """Save a prepared launcher after rechecking its data and catalog state."""
+        self._ensure_loaded()
+        if not isinstance(entry, Application):
+            raise ValueError('Prepared application must be an Application record.')
+        validated = _application({'id': entry.id, 'name': entry.name,
+                                  'command': entry.command, 'description': entry.description})
+        self._check_current()
+        if any(existing.id == validated.id for existing in self.entries):
+            raise ValueError('Application ID already exists in the catalog.')
+        if len(self.entries) >= MAX_APPS:
+            raise ValueError(f'Apps catalog supports at most {MAX_APPS} applications.')
+        self._save(self.entries + [validated])
+        return validated
+
+    def add(self, name, command, description=''):
+        return self.commit_add(self.prepare_add(name, command, description))
 
     def remove(self, app_id):
         self._ensure_loaded()

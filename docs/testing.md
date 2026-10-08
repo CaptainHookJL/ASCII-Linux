@@ -1,6 +1,9 @@
 # Validation and recovery
 
-Run from the repository root:
+Run from the repository root. The installation workflow tests require `curl`
+and download test payloads from a local HTTP server on `127.0.0.1`; they do not
+contact external services. On Debian/Ubuntu, use `sudo apt install curl` if it
+is missing:
 
 ```sh
 python3 -m desktop.main --check
@@ -38,10 +41,36 @@ unmatched query. R reloads the catalog. Restart the desktop to check persistence
 in `${XDG_DATA_HOME:-~/.local/share}/ascii-linux/apps.json`; relative XDG paths
 should use the default under `~/.local/share`. D requests confirmed removal:
 cancel once, then confirm and verify the launcher is gone while its program
-remains. Registration must not install software or scan `.desktop` files.
+remains. N registration must not install software or scan `.desktop` files.
 Esc returns to the desktop. Confirm descriptions and keyboard hints fit at the
 supported minimum size of 60 columns by 16 rows. Use a temporary catalog/home
 when testing so existing user launchers are preserved.
+
+Test I (Install from command) using a harmless local installer and a temporary
+home. Enter a name, a Bash command that writes a disposable app script, a launch
+command and an optional description. The scrollable review must display the
+complete install and launch commands, including quoted arguments. Cancel with
+N or Esc and verify neither the command nor catalog changes ran. Confirm with
+Y; verify the installer runs from the temporary home and the new launcher is
+saved only after a zero exit status. Launch it and check its output. Invalid
+launchers/catalogs must be rejected before the installer runs. Test nonzero
+exit, pipeline failure and interruption: the desktop returns, no launcher is
+added, and any files already written remain. Check that a pre-existing launcher
+and an unsaved editor buffer survive the flow. Installation commands may
+interactively ask for sudo, but automated checks should use local commands
+without sudo, remote downloads or host package changes. The automated curl
+download checks use only a local in-process HTTP server on `127.0.0.1`.
+
+For a separate manual Brave check on a Linux host with a graphical session,
+follow [Brave's official Linux installation page](https://brave.com/linux/).
+Install `curl` first with `sudo apt install curl` if missing. In I, use name
+`Brave`, installation command `curl -fsS https://dl.brave.com/install.sh | sh`,
+launch command `brave-browser`, and an optional description. Review, then
+confirm; the official installer may ask for sudo. Run the ASCII desktop in a
+terminal within the graphical session and launch Brave after successful
+installation. This cloud environment and the text-only ISO lack X11/Wayland
+display servers; actual Brave installation and GUI startup are unvalidated.
+The app installer workflow checks do not establish that Brave works on a host.
 
 After building, boot **both** QEMU firmware modes. Check that the bootloader loads,
 the live user reaches the desktop on tty1, F2 shows Welcome.txt, F3 returns after
