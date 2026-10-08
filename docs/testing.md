@@ -11,12 +11,21 @@ sh -n system/ascii-session system/profile/ascii-session.sh
 
 The tests use real Linux data and temporary files, and start the desktop inside
 a pseudo-terminal. They navigate the launcher, files, previews, and system page;
-launch and exit Bash; cancel a reboot; and confirm logout. They do not invoke
+launch and exit Bash; cancel a reboot; and confirm logout. The extended PTY suite
+copies/moves/renames files, creates folders, filters names, cancels and confirms
+deletion, opens/edits/saves documents, searches, saves under another name, preserves
+buffers across application switches and terminal resizing, and cancels unsaved
+replacement/logout prompts. All filesystem changes use temporary directories. They do not invoke
 power actions, format disks, or change host configuration.
 
 After building, boot **both** QEMU firmware modes. Check that the bootloader loads,
 the live user reaches the desktop on tty1, F2 shows Welcome.txt, F3 returns after
 `exit`, F4 reports sensible data, and power-menu cancellation does nothing.
+Test F9 and E from Files: edit and save Welcome.txt, create a new document,
+search, switch applications and return, and cancel an unsaved close. Test copy,
+rename, move, mkdir and confirmed deletion on disposable files in the live user's
+home directory. Re-run both firmware modes after desktop changes before releasing
+an updated ISO; earlier images do not contain these changes.
 Check `cat /etc/os-release`, `whoami`, and `tty` from F3: ASCII Linux, ascii, tty1.
 Use Ctrl+Alt+F2 to confirm a recovery getty is reachable. Confirm reboot/shutdown
 only in the disposable VM. Physical hardware, Wi-Fi, and VirtualBox/VMware/Boxes

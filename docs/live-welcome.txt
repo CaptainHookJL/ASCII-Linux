@@ -1,6 +1,10 @@
 Welcome to ASCII Linux 0.1.
 F1: launcher. F2: files. F3: Bash (exit returns to desktop).
-F4: system information. F10: power menu. Esc: desktop.
+F4: system information. F9: text editor. F10: power menu. Esc: back.
+Files: F5 copy, F6 move, F7 mkdir, F8 delete (permanent, confirmation),
+N rename, / search filenames, E edit selected file.
+Editor: Ctrl+S save, F6 save as, Ctrl+O open, Ctrl+N new, Ctrl+F find,
+F5 next match, Esc/Ctrl+Q close (confirms unsaved changes).
 This is a live prototype: changes are not persistent by default.
 For recovery use Ctrl+Alt+F2, or edit the boot command to add ascii.safe.
 There is no disk installer yet. Do not use this prototype for sensitive data.

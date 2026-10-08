@@ -3,9 +3,25 @@
 `desktop/main.py` parses options and owns terminal initialization/restoration.
 `desktop/core/desktop.py` renders the status bar, framed views, launcher, keyboard
 controls, confirmation dialogs, and shell suspension/resumption.
-`desktop/apps/file_manager.py` implements directory navigation and safe previews.
+`desktop/apps/file_manager.py` implements directory navigation, name filtering,
+file/directory mutations, and safe previews. It uses Linux libc's `renameat2`
+with NOREPLACE to publish copies and move directories without racing another
+writer. This narrowly scoped ctypes call avoids adding an external helper or
+replacing an existing destination; a link/unlink fallback supports files on
+filesystems without that syscall. Cross-device moves stage a copy before deleting
+the source. If source removal fails, the destination is retained and reported.
+`desktop/apps/text_editor.py` owns the text buffer, cursor, search, bounded UTF-8
+loading, and conflict-aware atomic saves. It contains no curses calls.
+`desktop/widgets/dialog.py` is the reusable input/confirmation widget.
+`desktop/utils/jobs.py` runs copy/move/delete work outside the curses thread,
+retaining a bounded progress snapshot. Only the UI thread touches curses; other
+file operations and session exit wait until an active filesystem job finishes.
 `desktop/utils/system.py` reads `/proc` and `/sys` with the logged-in user's rights.
-`tests/test_desktop.py` exercises data access and the real curses UI in a pseudo-TTY.
+`tests/test_desktop.py` exercises data access and the original curses workflows.
+`tests/test_file_operations.py` covers mutation integrity and failure cases;
+`tests/test_text_editor.py` covers editing, save conflicts, permissions and encodings;
+`tests/test_widgets.py` checks cursor/clipping alignment; and
+`tests/test_workflows.py` exercises file/editor workflows in a real pseudo-TTY.
 A pseudo-TTY is a terminal pair used to automate keyboard input and screen output.
 
 `build/build-iso.sh` configures Debian live-build, stages source and integration
