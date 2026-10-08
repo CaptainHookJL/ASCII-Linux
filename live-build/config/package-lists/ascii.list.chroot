@@ -17,6 +17,16 @@ iproute2
 network-manager
 ca-certificates
 curl
+xserver-xorg
+xinit
+xauth
+openbox
+xterm
+dbus-x11
+x11-utils
+x11-xserver-utils
+fonts-dejavu-core
+libgl1-mesa-dri
 firmware-linux
 firmware-iwlwifi
 firmware-realtek

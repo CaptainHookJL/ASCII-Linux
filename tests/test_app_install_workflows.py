@@ -53,6 +53,8 @@ def prepare_install(terminal, name, command, launch, description=''):
     terminal.send('\x15' + launch + '\r')
     terminal.wait('App description (optional)')
     terminal.send('\x15' + description + '\r')
+    terminal.wait('Launch mode:')
+    terminal.send('\x15t\r')
     terminal.wait('Review app install')
 
 

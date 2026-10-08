@@ -1,0 +1,69 @@
+#!/bin/sh
+# xinit owns the X server; this client owns only its window manager and terminal.
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
+if [ -z "${DISPLAY:-}" ]; then
+    printf 'ascii-xsession requires an X display. Run ascii-session from a console.\n' >&2
+    exit 1
+fi
+if [ "${ASCII_DBUS_SESSION:-}" != 1 ]; then
+    export ASCII_DBUS_SESSION=1
+    exec dbus-run-session -- "$0" "$@"
+fi
+if [ -f "$SCRIPT_DIR/openbox/rc.xml" ]; then
+    config="$SCRIPT_DIR/openbox/rc.xml"
+else
+    config=/etc/ascii-linux/openbox.xml
+fi
+if [ ! -f "$config" ]; then
+    printf 'Missing ASCII session window manager configuration: %s\n' "$config" >&2
+    exit 1
+fi
+wm_pid=
+terminal_pid=
+cleanup() {
+    trap - EXIT HUP INT TERM
+    if [ -n "$terminal_pid" ]; then
+        kill "$terminal_pid" 2>/dev/null || :
+        wait "$terminal_pid" 2>/dev/null || :
+    fi
+    if [ -n "$wm_pid" ]; then
+        kill "$wm_pid" 2>/dev/null || :
+        wait "$wm_pid" 2>/dev/null || :
+    fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+xsetroot -solid black || exit 1
+openbox --sm-disable --config-file "$config" &
+wm_pid=$!
+# Wait for the WM to acquire this display before mapping its desktop window.
+attempt=0
+while :; do
+    if ! kill -0 "$wm_pid" 2>/dev/null; then
+        wait "$wm_pid"
+        status=$?
+        printf 'The ASCII window manager stopped during startup.\n' >&2
+        [ "$status" -ne 0 ] || status=1
+        exit "$status"
+    fi
+    case "$(xprop -root _NET_SUPPORTING_WM_CHECK 2>/dev/null)" in
+        *'window id # 0x'*) break ;;
+    esac
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 50 ]; then
+        printf 'The ASCII window manager did not become ready.\n' >&2
+        exit 1
+    fi
+    sleep 0.1
+done
+xterm -class AsciiLinux -name ascii-linux-desktop -title 'ASCII Linux' \
+    -bg black -fg white -fa 'DejaVu Sans Mono' -fs 12 \
+    -b 0 +sb -vb \
+    -xrm 'AsciiLinux*VT100.translations: #override Ctrl <BtnDown>: ignore()' \
+    -e "$SCRIPT_DIR/ascii-console" "$@" &
+terminal_pid=$!
+wait "$terminal_pid"
+status=$?
+terminal_pid=
+exit "$status"

@@ -26,10 +26,14 @@ lb config --mode debian --distribution trixie --architectures amd64 \
 cp -a "$ROOT/live-build/config/." config/
 mkdir -p config/includes.chroot/usr/lib/ascii-linux config/includes.chroot/usr/local/bin \
     config/includes.chroot/etc/profile.d config/includes.chroot/etc/sudoers.d \
+    config/includes.chroot/etc/ascii-linux \
     config/includes.chroot/etc/skel/Documents
 cp -a "$ROOT/desktop" config/includes.chroot/usr/lib/ascii-linux/
 find config/includes.chroot/usr/lib/ascii-linux -type d -name __pycache__ -prune -exec rm -rf {} +
 install -m 755 "$ROOT/system/ascii-session" config/includes.chroot/usr/local/bin/ascii-session
+install -m 755 "$ROOT/system/ascii-console" config/includes.chroot/usr/local/bin/ascii-console
+install -m 755 "$ROOT/system/ascii-xsession" config/includes.chroot/usr/local/bin/ascii-xsession
+install -m 644 "$ROOT/system/openbox/rc.xml" config/includes.chroot/etc/ascii-linux/openbox.xml
 install -m 644 "$ROOT/system/profile/ascii-session.sh" config/includes.chroot/etc/profile.d/ascii-session.sh
 install -m 440 "$ROOT/system/ascii-power" config/includes.chroot/etc/sudoers.d/ascii-power
 cp "$ROOT/branding/motd" config/includes.chroot/etc/motd

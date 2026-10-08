@@ -76,7 +76,7 @@ class TerminalTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             (Path(directory) / 'example.txt').write_text('Functional preview content')
             environment = dict(os.environ, TERM='xterm-256color', HOME=directory)
-            command = ['python3', '-m', 'desktop.main'] + (['--ascii'] if ascii_only else [])
+            command = ['python3', '-m', 'desktop.main'] + (['--ascii'] if ascii_only else ['--unicode'])
             process = subprocess.Popen(command,
                                        stdin=slave, stdout=slave, stderr=slave,
                                        env=environment, start_new_session=True)

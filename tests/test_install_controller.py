@@ -33,6 +33,7 @@ class InstallControllerTests(unittest.TestCase):
             'A personal application'])
         desktop.review_install = mock.Mock(return_value=review)
         desktop.external = mock.Mock(return_value=result)
+        desktop.app_launch_mode = mock.Mock(return_value='terminal')
         return desktop
 
     def test_invalid_launcher_prevents_review_execution_and_registration(self):

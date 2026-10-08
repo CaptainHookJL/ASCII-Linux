@@ -10,6 +10,7 @@ import unicodedata
 
 from desktop.apps.file_manager import FileManager, preview
 from desktop.apps.catalog import validate_install_command
+from desktop.apps.launcher import GraphicalLauncher, graphical_session_available
 from desktop.apps.text_editor import TextEditor
 from desktop.core.system_views import SystemApps
 from desktop.utils.jobs import FileJob
@@ -54,7 +55,7 @@ def input_path(name):
 
 
 class Desktop:
-    def __init__(self, screen, ascii_only=False):
+    def __init__(self, screen, ascii_only=True):
         self.screen = screen
         self.ascii_only = ascii_only
         self.page = 'home'
@@ -75,6 +76,7 @@ class Desktop:
         self.editor_return = 'home'
         self.system_apps = SystemApps(self)
         self.apps = AppsSection()
+        self.graphical_launcher = GraphicalLauncher()
 
     def display(self, text):
         text = clean(text)
@@ -117,6 +119,9 @@ class Desktop:
 
     def tick(self):
         self.system_apps.tick()
+        for app, status in self.graphical_launcher.poll():
+            if status:
+                self.message = f'{app.name} exited with status {status}'
         now = time.monotonic()
         if now - self.last_tick >= 1:
             self.cpu_value = self.cpu.sample()
@@ -343,7 +348,7 @@ class Desktop:
         if page == 'files':
             self.browser.refresh()
         elif page == 'help':
-            self.lines = ['ASCII Linux 0.1 — Debian-based console desktop.',
+            self.lines = ['ASCII Linux 0.1 - ASCII desktop with graphical apps.',
                           'F1 Menu, F2 Files, F3 Bash, F4 System, F9 Editor, F10 Power.',
                           'F11 Processes, F12 Network (also available in F1 Menu).',
                           'Home: Apps section uses arrows/Tab and Enter; A browses all.',
@@ -351,6 +356,9 @@ class Desktop:
                           'Apps: N add existing, I install from command, D remove launcher.',
                           'Apps: R reload, / search; install command is reviewed first.',
                           'Apps: arrows/Tab select, Enter run, Esc desktop.',
+                          'Apps: M changes terminal/graphical launch mode.',
+                          'Graphical apps open separate windows; Alt+Tab switches.',
+                          'Dedicated X11 session: Super+D returns to the ASCII desktop.',
                           'Files: Enter previews; E edits; Backspace goes to parent.',
                           'H toggles hidden files; R refreshes; / filters filenames.',
                           'F5 Copy, F6 Move, F7 Mkdir, F8 Delete, N Rename.',
@@ -488,7 +496,23 @@ class Desktop:
         app = self.apps.selected_entry
         if app is None:
             return
-        self.external(app.command, cwd=Path.home())
+        if app.launch_mode == 'graphical':
+            self.graphical_launcher.launch(app)
+            self.message = 'Opened: ' + app.name + ' | Alt+Tab switches windows'
+        else:
+            self.external(app.command, cwd=Path.home())
+
+    def app_launch_mode(self, initial=None):
+        initial = initial or ('graphical' if graphical_session_available() else 'terminal')
+        value = self.prompt('Launch mode: g graphical window / t terminal', initial[0])
+        if value is None:
+            return None
+        modes = {'g': 'graphical', 'graphical': 'graphical',
+                 't': 'terminal', 'terminal': 'terminal'}
+        try:
+            return modes[value.strip().lower()]
+        except KeyError:
+            raise ValueError('Choose g for a graphical window or t for a terminal app.') from None
 
     def add_app(self):
         name = self.prompt('Add app: name')
@@ -500,14 +524,18 @@ class Desktop:
         description = self.prompt('Add app: description (optional)')
         if description is None:
             return
-        entry = self.apps.add(name, command, description)
+        mode = self.app_launch_mode()
+        if mode is None:
+            return
+        entry = self.apps.add(name, command, description, launch_mode=mode)
         self.message = 'App added: ' + entry.name
 
     def review_install(self, entry, command):
         previous = self.page, self.lines, self.offset, self.message
         self.page, self.offset, self.message = 'install_review', 0, ''
         self.lines = [f'App: {entry.name}', 'Download/install command:', command, '',
-                      'Launch command after installation:', shlex.join(entry.command), '',
+                      'Launch command after installation:', shlex.join(entry.command),
+                      'Launch mode: ' + entry.launch_mode, '',
                       'The install command runs in Bash from your home directory.',
                       'It may download files, install packages and ask for sudo.',
                       'The launcher is saved only if the command succeeds.',
@@ -544,6 +572,10 @@ class Desktop:
         if description is None:
             return
         entry = self.apps.catalog.prepare_add(name, launch, description)
+        mode = self.app_launch_mode()
+        if mode is None:
+            return
+        entry = self.apps.catalog.prepare_add(name, launch, description, launch_mode=mode)
         if not self.review_install(entry, command):
             self.message = 'Install cancelled'
             return
@@ -574,6 +606,13 @@ class Desktop:
             self.add_app()
         elif self.page == 'apps' and key in ('i', 'I'):
             self.install_app()
+        elif self.page == 'apps' and key in ('m', 'M'):
+            entry = self.apps.selected_entry
+            if entry:
+                mode = self.app_launch_mode(entry.launch_mode)
+                if mode is not None:
+                    self.apps.set_launch_mode(entry.id, mode)
+                    self.message = f'{entry.name}: {mode}'
         elif self.page == 'apps' and key in ('d', 'D'):
             entry = self.apps.selected_entry
             if entry and self.confirm(f'Remove launcher for {entry.name}? The app files will be kept.'):

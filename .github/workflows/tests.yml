@@ -11,4 +11,4 @@ jobs:
       - run: python3 -m desktop.main --check
       - run: python3 -m unittest discover -s tests -v
       - run: bash -n build/build-iso.sh build/clean.sh build/test-qemu.sh
-      - run: sh -n system/ascii-session system/profile/ascii-session.sh live-build/config/hooks/live/0100-branding.hook.chroot
+      - run: sh -n system/ascii-session system/ascii-console system/ascii-xsession system/profile/ascii-session.sh live-build/config/hooks/live/0100-branding.hook.chroot

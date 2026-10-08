@@ -18,7 +18,8 @@ class Terminal:
         self.master, slave = pty.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 28, 110, 0, 0))
         self.process = subprocess.Popen(
-            ['python3', '-m', 'desktop.main'] + (['--ascii'] if ascii_only else []),
+            ['python3', '-m', 'desktop.main'] +
+            ((['--ascii'] if ascii_only else ['--unicode']) if ascii_only is not None else []),
             stdin=slave, stdout=slave, stderr=slave, start_new_session=True,
             preexec_fn=(lambda: fcntl.ioctl(slave, termios.TIOCSCTTY, 0)) if controlling else None,
             env=dict(os.environ, TERM='xterm-256color', HOME=str(home), LANG='C.UTF-8',

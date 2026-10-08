@@ -5,7 +5,8 @@
 controls, confirmation dialogs, and shell suspension/resumption.
 `desktop/apps/catalog.py` validates, loads and saves the user's launcher catalog
 at `${XDG_DATA_HOME:-~/.local/share}/ascii-linux/apps.json`, ignoring relative XDG
-paths. Each JSON record has an id, name, command argument list and description.
+paths. Each JSON record has an id, name, command argument list, description and
+launch mode (`terminal` or `graphical`). Older records without a mode default to terminal.
 It parses entered commands with POSIX `shlex`, uses atomic saves and checks for
 external changes. It does not install or execute applications.
 `desktop/widgets/apps.py` renders the desktop Apps panel and full Apps page using
@@ -13,7 +14,11 @@ the shared table selection/filtering model. It follows terminal size, sorts
 entries alphabetically by name, and leaves application startup to the desktop controller.
 The desktop controller handles adding/removing launchers and runs their launch
 commands without an implicit shell, with the user's home as the working
-directory, while suspending and restoring curses. Install from command (`I`)
+directory. Terminal commands suspend and restore curses. Graphical commands
+inherit display/session variables and run in background child processes; the
+controller polls and reaps exited children and reports nonzero exit statuses.
+Their standard streams do not write over the ASCII interface. A graphical launch
+without a display is rejected. `M` changes a saved launcher's mode. Install from command (`I`)
 collects a Bash download/install command and a separate launch argument list.
 It validates the launcher and catalog before execution, shows a scrollable
 review of both commands, and requires Y to proceed. The installer runs as
@@ -22,9 +27,9 @@ saving the launcher; failure or interruption is reported after restoring the
 desktop and does not undo files changed by the installer. Built-in tools keep
 their F1 and function-key routes and are separate from the initially empty user
 Apps list. There is no default Brave entry, automatic installer, or `.desktop`
-discovery. Native graphical apps need an existing graphical session; the live
-image supplies no X11/Wayland server. Brave installation and GUI execution have
-not been validated in this cloud environment.
+discovery. The live image supplies a minimal X11 session for native graphical
+apps. Brave installation and execution have not been validated in this cloud
+environment.
 `tests/test_apps_workflows.py` exercises the Apps section in real terminals.
 `tests/test_install_controller.py` checks preflight validation, review cancellation,
 installer status handling and launcher commits. `tests/test_app_install_workflows.py`
@@ -69,21 +74,38 @@ A pseudo-TTY is a terminal pair used to automate keyboard input and screen outpu
 `build/build-iso.sh` configures Debian live-build, stages source and integration
 files into its temporary tree, builds the ISO, and generates a SHA-256 checksum.
 `build/clean.sh` removes temporary state through live-build's cleanup path.
-`build/test-qemu.sh` launches the artifact with BIOS or OVMF UEFI firmware.
+`build/test-qemu.sh` launches the artifact with BIOS or OVMF UEFI firmware in a
+GTK window. Its `--console` option selects curses VGA for console recovery tests;
+append `ascii.console` to the boot menu's kernel command line for those tests.
 `live-build/config/package-lists/ascii.list.chroot` selects runtime packages.
 `live-build/config/hooks/live/0100-branding.hook.chroot` sets release identity,
 hostname, and console target, and checks the power sudoers syntax.
 
-`system/ascii-session` launches the desktop and offers a recovery Bash on error.
+`system/ascii-session` selects the runtime: an existing graphical terminal uses
+the console interface with access to that display, and a local TTY without a
+display starts a dedicated X11 session through `startx`. `--console` forces
+console mode; `--graphical` requires a local TTY without an existing display.
+`system/ascii-console` runs the Python desktop and offers a recovery Bash on error.
+`system/ascii-xsession` starts a D-Bus session, Openbox and a frameless, maximized
+xterm containing the ASCII desktop. The terminal uses a normal window layer so
+Alt+Tab can bring it back above graphical apps. Super+D focuses the desktop.
+Openbox supplies native window management without a panel or root menu. Exiting
+the desktop ends the dedicated session; X11 startup failure falls back to console.
+`system/openbox/rc.xml` defines the frameless desktop rule, native app decorations
+and window-switching keys, and omits root-menu actions. It is installed as
+`/etc/ascii-linux/openbox.xml`; X11 uses local sockets with TCP listening disabled.
 `system/profile/ascii-session.sh` activates that session only on tty1 and supports
-an `ascii.safe` kernel command-line override. `system/ascii-power` is the narrow
+`ascii.safe` for a recovery shell and `ascii.console` for a console desktop.
+`system/ascii-power` is the narrow
 power-command sudo policy. `branding/` contains issue, MOTD, and ASCII logo.
 `docs/live-welcome.txt` is copied into the live user's Documents directory.
 
 Boot flow: firmware → Debian live bootloader → kernel/live-boot → systemd →
-getty/live-config autologin → login profile → ascii-session → curses desktop.
+getty/live-config autologin → login profile → ascii-session → startx → D-Bus/Openbox
+→ xterm → ASCII desktop. A native graphical app opens another X11 window.
 A getty handles a Linux terminal and login; it is not a graphical display manager.
-`multi-user.target` is systemd's normal non-graphical service target.
+`multi-user.target` is systemd's normal non-graphical service target; X11 starts
+within the live user's login session rather than through a display manager.
 `/etc/os-release` identifies ASCII Linux while retaining `ID_LIKE=debian`.
 
 Debian live-build supplies BIOS and UEFI bootloader templates. ISO application

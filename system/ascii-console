@@ -1,0 +1,16 @@
+#!/bin/sh
+# The desktop and its apps run as the logged-in user.
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
+if [ -d "$SCRIPT_DIR/../desktop" ]; then
+    cd "$SCRIPT_DIR/.." || exit 1
+else
+    cd /usr/lib/ascii-linux || exit 1
+fi
+export PYTHONDONTWRITEBYTECODE=1
+python3 -m desktop.main --ascii "$@"
+status=$?
+if [ "$status" -ne 0 ]; then
+    printf '\nASCII desktop failed (status %s). Starting a recovery shell.\n' "$status" >&2
+    exec /bin/bash --noprofile --norc
+fi
+exit "$status"

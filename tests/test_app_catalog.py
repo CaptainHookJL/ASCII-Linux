@@ -9,6 +9,7 @@ from unittest import mock
 
 from desktop.apps.catalog import (Application, AppCatalog, MAX_APPS, MAX_COMMAND_CHARS,
                                   MAX_FILE_BYTES, validate_install_command)
+from desktop.widgets.apps import AppsSection
 
 
 class AppCatalogTests(unittest.TestCase):
@@ -49,7 +50,87 @@ class AppCatalogTests(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o600)
         self.assertIn('Café 東京', self.path.read_text())
         self.assertEqual(set(json.loads(self.path.read_text())[0]),
-                         {'id', 'name', 'command', 'description'})
+                         {'id', 'name', 'command', 'description', 'launch_mode'})
+
+    def test_legacy_records_default_to_terminal_without_rewriting_them_on_load(self):
+        self.write_records([self.record()])
+        original = self.path.read_bytes()
+        entry, = self.catalog.load()
+        self.assertEqual(entry.launch_mode, 'terminal')
+        self.assertEqual(self.path.read_bytes(), original)
+        self.catalog.add('Browser', 'brave-browser', launch_mode='graphical')
+        reloaded = AppCatalog(self.path).load()
+        self.assertEqual([app.launch_mode for app in reloaded], ['terminal', 'graphical'])
+
+    def test_graphical_mode_is_preserved_through_preparation_commit_and_reload(self):
+        prepared = self.catalog.prepare_add('Browser', 'brave-browser --new-window',
+                                            'A graphical browser', launch_mode='graphical')
+        self.assertEqual(prepared.launch_mode, 'graphical')
+        self.assertFalse(self.path.exists())
+        self.assertEqual(self.catalog.commit_add(prepared), prepared)
+        self.assertEqual(AppCatalog(self.path).load(), [prepared])
+        self.assertEqual(json.loads(self.path.read_text())[0]['launch_mode'], 'graphical')
+
+    def test_invalid_launch_modes_are_rejected_without_changing_saved_data(self):
+        saved = self.catalog.add('Saved', 'saved')
+        original = self.path.read_bytes()
+        for mode in [None, 1, [], '', 'background', 'Graphical']:
+            with self.subTest(launch_mode=mode):
+                with self.assertRaisesRegex(ValueError, 'Launch mode'):
+                    self.catalog.prepare_add('Browser', 'brave-browser', launch_mode=mode)
+                with self.assertRaisesRegex(ValueError, 'Launch mode'):
+                    self.catalog.commit_add(Application('new', 'Browser', ('brave-browser',),
+                                                        launch_mode=mode))
+                self.assertEqual(self.path.read_bytes(), original)
+                self.assertEqual(self.catalog.entries, [saved])
+
+    def test_existing_launcher_mode_update_preserves_other_fields_entries_and_permissions(self):
+        browser = self.catalog.add('Brave browser', 'brave-browser --new-window', 'My browser')
+        other = self.catalog.add('Editor', 'nano')
+        self.path.chmod(0o640)
+        self.catalog.load()
+        updated = self.catalog.set_launch_mode(browser.id, 'graphical')
+        self.assertEqual(updated, Application(browser.id, browser.name, browser.command,
+                                              browser.description, 'graphical'))
+        self.assertEqual(AppCatalog(self.path).load(), [updated, other])
+        self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o640)
+        self.assertEqual(self.catalog.set_launch_mode(browser.id, 'terminal'), browser)
+        self.assertEqual(AppCatalog(self.path).load(), [browser, other])
+
+    def test_launcher_mode_update_refuses_unknown_id_and_invalid_mode(self):
+        saved = self.catalog.add('Saved', 'saved')
+        original = self.path.read_bytes()
+        for app_id, mode, message in [('missing', 'graphical', 'no longer'),
+                                      (saved.id, 'unknown', 'Launch mode'),
+                                      ('', 'graphical', 'ID cannot be empty')]:
+            with self.subTest(app_id=app_id, mode=mode), self.assertRaisesRegex(ValueError, message):
+                self.catalog.set_launch_mode(app_id, mode)
+            self.assertEqual(self.path.read_bytes(), original)
+            self.assertEqual(self.catalog.entries, [saved])
+
+    def test_launcher_mode_update_preserves_external_catalog_changes(self):
+        saved = self.catalog.add('Saved', 'saved')
+        competing = AppCatalog(self.path).add('Competing', 'competing')
+        original = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'changed outside'):
+            self.catalog.set_launch_mode(saved.id, 'graphical')
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(self.catalog.entries, [saved])
+        self.assertEqual(AppCatalog(self.path).load(), [saved, competing])
+
+    def test_apps_section_mode_update_keeps_search_and_selected_launcher(self):
+        self.catalog.add('Another browser', 'other-browser')
+        browser = self.catalog.add('Brave browser', 'brave-browser')
+        self.catalog.add('Text editor', 'nano')
+        section = AppsSection(self.catalog)
+        section.set_query('browser')
+        section.next()
+        self.assertEqual(section.selected_entry.id, browser.id)
+        updated = section.set_launch_mode(browser.id, 'graphical')
+        self.assertEqual(section.query, 'browser')
+        self.assertEqual(section.selected_entry, updated)
+        self.assertEqual(updated.launch_mode, 'graphical')
+        self.assertEqual(len(section.entries), 2)
 
     def test_tilde_executable_expands_but_relative_executable_stays_relative(self):
         with mock.patch.dict(os.environ, {'HOME': str(self.root)}):
@@ -97,7 +178,8 @@ class AppCatalogTests(unittest.TestCase):
                  [dict(good, command=[])], [dict(good, command=[''])],
                  [dict(good, command=['app', 7])], [dict(good, command=['app', '\n'])],
                  [dict(good, name='bad\x00')], [dict(good, description=[])],
-                 [dict(good, id='')], [dict(good, unexpected='keep this')], [good, good]]
+                 [dict(good, id='')], [dict(good, launch_mode='background')],
+                 [dict(good, launch_mode=None)], [dict(good, unexpected='keep this')], [good, good]]
         for records in cases:
             with self.subTest(records=records):
                 self.write_records(records)

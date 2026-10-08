@@ -9,7 +9,8 @@ is missing:
 python3 -m desktop.main --check
 python3 -m unittest discover -s tests -v
 bash -n build/*.sh
-sh -n system/ascii-session system/profile/ascii-session.sh
+sh -n system/ascii-session system/ascii-console system/ascii-xsession \
+  system/profile/ascii-session.sh
 ```
 
 The tests use real Linux data and temporary files, and start the desktop inside
@@ -30,8 +31,8 @@ should remain visible after resizing. A fresh catalog should show an empty Apps
 list, while Files, Text editor, Terminal, System information, Processes and
 Network remain available through F1 and their function keys. Open full Apps with
 A from the desktop and F1 menu, and through the Apps menu entry. Press N and
-register a harmless command with a name and optional description; for example,
-use `python3 /home/jacob/my-app/main.py` after creating that script. Use arrows
+register a harmless command with a name, optional description and terminal mode;
+for example, use `python3 /home/jacob/my-app/main.py` after creating that script. Use arrows
 and Tab to select it, then Enter to launch and check the return to the desktop.
 Confirm execution uses the user's home directory and that a path with spaces
 works when quoted. Scripts must be executable or use an interpreter command.
@@ -48,8 +49,8 @@ when testing so existing user launchers are preserved.
 
 Test I (Install from command) using a harmless local installer and a temporary
 home. Enter a name, a Bash command that writes a disposable app script, a launch
-command and an optional description. The scrollable review must display the
-complete install and launch commands, including quoted arguments. Cancel with
+command, optional description and terminal mode. The scrollable review must
+display the complete install and launch commands, including quoted arguments. Cancel with
 N or Esc and verify neither the command nor catalog changes ran. Confirm with
 Y; verify the installer runs from the temporary home and the new launcher is
 saved only after a zero exit status. Launch it and check its output. Invalid
@@ -61,19 +62,37 @@ interactively ask for sudo, but automated checks should use local commands
 without sudo, remote downloads or host package changes. The automated curl
 download checks use only a local in-process HTTP server on `127.0.0.1`.
 
-For a separate manual Brave check on a Linux host with a graphical session,
+For a native-window check, start the dedicated session from a local login TTY
+with `./system/ascii-session`, or run `python3 -m desktop.main` in an existing
+graphical terminal. Add an installed graphical program with N and select `g`;
+`xmessage 'ASCII Linux graphical app test'` is a simple example if `x11-utils`
+is installed. Enter must open its window while the ASCII desktop remains usable.
+Switch back with Alt+Tab, then navigate Files, open/edit a disposable document,
+and return to Apps while the graphical program is still running. In the dedicated
+session, Super+D must focus and raise the frameless ASCII desktop; Alt+Tab must
+also return to the app. Closing the app must leave the desktop running, and
+closing the desktop must end its dedicated session. Confirm a missing executable
+or nonzero exit shows a status message without damaging the ASCII screen.
+Switch a saved launcher's mode with M, restart the desktop and verify persistence;
+records created before modes were added must retain terminal behavior. In a
+console session without a display, graphical launching must show an error and
+keep the desktop usable. No panel or graphical root menu should appear.
+
+For a separate manual Brave check in that graphical session,
 follow [Brave's official Linux installation page](https://brave.com/linux/).
 Install `curl` first with `sudo apt install curl` if missing. In I, use name
 `Brave`, installation command `curl -fsS https://dl.brave.com/install.sh | sh`,
-launch command `brave-browser`, and an optional description. Review, then
-confirm; the official installer may ask for sudo. Run the ASCII desktop in a
+launch command `brave-browser`, an optional description, and graphical mode `g`.
+For a previously saved Brave launcher, use M to change it to graphical mode.
+Review, then confirm; the official installer may ask for sudo. Run the ASCII desktop in a
 terminal within the graphical session and launch Brave after successful
-installation. This cloud environment and the text-only ISO lack X11/Wayland
-display servers; actual Brave installation and GUI startup are unvalidated.
+installation. The live-image configuration now includes X11, Openbox and xterm;
+actual Brave installation and startup are unvalidated here.
 The app installer workflow checks do not establish that Brave works on a host.
 
-After building, boot **both** QEMU firmware modes. Check that the bootloader loads,
-the live user reaches the desktop on tty1, F2 shows Welcome.txt, F3 returns after
+After building, boot **both** QEMU firmware modes in QEMU's graphical window.
+Check that the bootloader loads, the live user reaches the frameless ASCII
+desktop through the tty1 session, F2 shows Welcome.txt, F3 returns after
 `exit`, F4 reports sensible data, and power-menu cancellation does nothing.
 Check the initially empty Apps list, registration, navigation and launching from
 the desktop and full Apps page. Saved launchers should survive a desktop restart;
@@ -89,22 +108,30 @@ compare addresses with `ip address`, verify routes/DNS and scroll the detail vie
 Wi-Fi interface detection is implemented; Wi-Fi connection changes are deferred.
 Re-run both firmware modes after desktop changes before releasing
 an updated ISO; earlier images do not contain these changes.
-Check `cat /etc/os-release`, `whoami`, and `tty` from F3: ASCII Linux, ascii, tty1.
+Check `cat /etc/os-release`, `whoami`, and `tty` from F3: ASCII Linux, ascii, and
+an xterm pseudo-terminal such as `/dev/pts/0`. Verify native-window launching,
+Alt+Tab and Super+D as above. Test `ascii.console` separately: it should reach
+the ASCII interface directly on tty1 and reject graphical launchers without a
+display. Use `./build/test-qemu.sh --console` for a terminal-only QEMU check,
+then append `ascii.console` in the boot menu; the flag alone does not edit the
+ISO's kernel command line. Append `ascii.safe` for a recovery shell instead.
 Use Ctrl+Alt+F2 to confirm a recovery getty is reachable. Confirm reboot/shutdown
 only in the disposable VM. Physical hardware, Wi-Fi, and VirtualBox/VMware/Boxes
 require separate testing; QEMU alone does not establish those capabilities.
 
-If the desktop fails, ascii-session starts a recovery shell. Inspect:
+X11 startup failure falls back to the console interface. If the Python desktop
+fails, ascii-console starts a recovery shell. Inspect:
 
 ```sh
 journalctl -b
 systemctl status getty@tty1.service
 python3 -m desktop.main --check  # from /usr/lib/ascii-linux
-/usr/local/bin/ascii-session --ascii
+/usr/local/bin/ascii-session --console
 ```
 
 For a boot-time bypass, edit the boot menu's kernel command line and append
 `ascii.safe` before starting the live system. tty1 then remains a normal shell.
+Use `ascii.console` when you want the ASCII desktop without X11.
 Other TTYs are unaffected. Avoid setting `ASCII_SESSION_ACTIVE` yourself unless
 you intentionally want to bypass the profile hook. The desktop's F3 shell inherits
 this flag so its login profile cannot recursively launch another desktop.

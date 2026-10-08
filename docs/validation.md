@@ -1,6 +1,40 @@
 # Current validation — 2026-10-08
 
-Executed in a Debian 13 amd64 cloud container:
+Source and native X11 checks ran in a Debian 13 amd64 cloud container. The
+graphical-session results and earlier desktop baseline are recorded below.
+
+## Graphical-session update
+
+- All 178 unittest tests passed with no skips, covering the earlier desktop
+  checks plus catalog modes, graphical launching, session behavior and the QEMU
+  helper. Mode checks cover legacy terminal defaults, persistence and changing
+  a saved mode. Launcher checks cover nonblocking
+  startup, inherited display variables, a home working directory, absent
+  displays, missing executables, exit reporting and editor-buffer preservation.
+  Session checks cover runtime selection, console fallback, local-TTY startup
+  and recovery-shell startup.
+- Four VM-launcher tests passed using a disposable argument-capture executable.
+  They check the default GTK display, console curses display/recovery guidance,
+  invalid-option rejection and help without an ISO. They do not boot QEMU.
+- `python3 -m desktop.main --check`, all build/integration shell syntax checks
+  including the new session helpers, and `git diff --check` passed.
+- A headless Xorg server with the Debian dummy video driver ran the actual
+  Openbox/xterm session. The ASCII terminal filled its 1280-by-800 display with
+  zero frame extents. A native `xmessage` window appeared above it with normal
+  decorations; Alt+Tab switched in both directions and Super+D focused and
+  raised the ASCII desktop. This checks native X11 windows, not an ISO boot.
+- A real Apps UI workflow registered `xmessage` through N with graphical mode,
+  then launched its native window with Enter. The ASCII desktop stayed alive;
+  F9 opened the editor and saved a temporary document while the app remained
+  open. Alt+Tab and Super+D worked. Alt+F4 closed the graphical app and left the
+  ASCII desktop protected; Ctrl+click on all three mouse buttons opened no
+  xterm menus. Confirmed desktop logout exited successfully and cleaned up its
+  own terminal and Openbox, leaving the independent Xorg server and unrelated
+  test window running. Actual ISO build and BIOS/UEFI boot remain unverified.
+
+## Earlier desktop baseline
+
+Executed before graphical-session changes:
 
 - All 150 unittest tests passed, with no skips or disabled cases: 42 earlier
   file/editor/system/widget/terminal checks; 18 editor-history tests; 18 process
@@ -54,8 +88,9 @@ Executed in a Debian 13 amd64 cloud container:
   ignored approval below the supported terminal size, cancellation, and Ctrl+C
   interruption while preserving and saving an existing editor buffer. No remote
   installer, sudo command or host package change was executed by these tests.
-- The Brave example uses its documented install/launch commands and requires an
-  existing graphical Linux session. Read-only requests to the official website
+- The Brave example uses its documented install/launch commands. The new live
+  configuration includes X11; other hosts need an existing graphical session.
+  Read-only requests to the official website
   and installer URL returned HTTP 403 in this environment. Brave installation,
   repository/package setup, and native GUI startup remain **unverified** here.
 - `python3 -m desktop.main --check` and build/integration shell syntax checks passed.

@@ -11,6 +11,6 @@ VERSION="0.1 (Debian trixie)"
 VERSION_ID="0.1"
 EOF
 printf 'ascii-linux\n' > /etc/hostname
-# The image is console-only; getty and normal Linux login own the session.
+# Getty and normal Linux login start a user-owned X11 or recovery console session.
 systemctl set-default multi-user.target
 visudo -cf /etc/sudoers.d/ascii-power

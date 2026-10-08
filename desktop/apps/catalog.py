@@ -1,5 +1,5 @@
 """Persistent user-added application commands, without shell execution."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 import os
 from pathlib import Path
@@ -21,6 +21,7 @@ class Application:
     name: str
     command: tuple[str, ...]
     description: str = ''
+    launch_mode: str = 'terminal'
 
 
 @dataclass(frozen=True)
@@ -52,23 +53,32 @@ def validate_install_command(command):
     return _string(command, 'Download/install command', MAX_COMMAND_CHARS).strip()
 
 
+def _launch_mode(value):
+    if not isinstance(value, str) or value not in ('terminal', 'graphical'):
+        raise ValueError('Launch mode must be terminal or graphical.')
+    return value
+
+
 def _application(record):
-    if not isinstance(record, dict) or set(record) - {'id', 'name', 'command', 'description'}:
+    if not isinstance(record, dict) or set(record) - {
+            'id', 'name', 'command', 'description', 'launch_mode'}:
         raise ValueError('Apps catalog contains an invalid application record.')
     app_id = _string(record.get('id'), 'Application ID', 128)
     name = _string(record.get('name'), 'Application name', 128)
     description = _string(record.get('description', ''), 'Description', 1024, allow_empty=True)
+    launch_mode = _launch_mode(record.get('launch_mode', 'terminal'))
     command = record.get('command')
     if not isinstance(command, (list, tuple)) or not 1 <= len(command) <= MAX_ARGUMENTS:
         raise ValueError(f'Command must contain 1 to {MAX_ARGUMENTS} arguments.')
     arguments = tuple(_string(argument, 'Command argument', 4096, allow_empty=index != 0)
                       for index, argument in enumerate(command))
-    return Application(app_id, name, arguments, description)
+    return Application(app_id, name, arguments, description, launch_mode)
 
 
 def _records(entries):
     return [{'id': entry.id, 'name': entry.name, 'command': list(entry.command),
-             'description': entry.description} for entry in entries]
+             'description': entry.description, 'launch_mode': entry.launch_mode}
+            for entry in entries]
 
 
 def _unique_object(pairs):
@@ -185,7 +195,7 @@ class AppCatalog:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
 
-    def prepare_add(self, name, command, description=''):
+    def prepare_add(self, name, command, description='', launch_mode='terminal'):
         """Validate a prospective launcher without writing it to the catalog."""
         self._ensure_loaded()
         name = _string(name, 'Application name', 128).strip()
@@ -204,7 +214,7 @@ class AppCatalog:
         except RuntimeError as error:
             raise ValueError('Cannot expand the executable path: unknown home directory.') from error
         entry = _application({'id': uuid.uuid4().hex, 'name': name, 'command': arguments,
-                              'description': description})
+                              'description': description, 'launch_mode': launch_mode})
         self._check_current()
         if len(self.entries) >= MAX_APPS:
             raise ValueError(f'Apps catalog supports at most {MAX_APPS} applications.')
@@ -217,7 +227,8 @@ class AppCatalog:
         if not isinstance(entry, Application):
             raise ValueError('Prepared application must be an Application record.')
         validated = _application({'id': entry.id, 'name': entry.name,
-                                  'command': entry.command, 'description': entry.description})
+                                  'command': entry.command, 'description': entry.description,
+                                  'launch_mode': entry.launch_mode})
         self._check_current()
         if any(existing.id == validated.id for existing in self.entries):
             raise ValueError('Application ID already exists in the catalog.')
@@ -226,8 +237,23 @@ class AppCatalog:
         self._save(self.entries + [validated])
         return validated
 
-    def add(self, name, command, description=''):
-        return self.commit_add(self.prepare_add(name, command, description))
+    def add(self, name, command, description='', launch_mode='terminal'):
+        return self.commit_add(self.prepare_add(name, command, description, launch_mode))
+
+    def set_launch_mode(self, app_id, launch_mode):
+        """Change one launcher's mode without replacing its command or identity."""
+        self._ensure_loaded()
+        _string(app_id, 'Application ID', 128)
+        launch_mode = _launch_mode(launch_mode)
+        self._check_current()
+        for index, entry in enumerate(self.entries):
+            if entry.id == app_id:
+                updated = replace(entry, launch_mode=launch_mode)
+                entries = self.entries.copy()
+                entries[index] = updated
+                self._save(entries)
+                return updated
+        raise ValueError('Application is no longer in the catalog; reload it.')
 
     def remove(self, app_id):
         self._ensure_loaded()

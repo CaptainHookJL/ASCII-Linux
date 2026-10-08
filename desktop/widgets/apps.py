@@ -27,7 +27,8 @@ class AppsSection:
         self.error = ''
         self.table = Table(
             identity=lambda entry: entry.id,
-            searchable=lambda entry: f'{entry.name} {entry.description} {shlex.join(entry.command)}',
+            searchable=lambda entry: (f'{entry.name} {entry.description} '
+                                      f'{shlex.join(entry.command)} {entry.launch_mode}'),
             sorts={'name': (lambda entry: (entry.name.casefold(), entry.id), False)},
             sort_key='name')
         try:
@@ -44,8 +45,8 @@ class AppsSection:
         self.table.update(entries)
         self.error = ''
 
-    def add(self, name, command, description=''):
-        entry = self.catalog.prepare_add(name, command, description)
+    def add(self, name, command, description='', launch_mode='terminal'):
+        entry = self.catalog.prepare_add(name, command, description, launch_mode)
         return self.add_prepared(entry)
 
     def add_prepared(self, entry):
@@ -60,6 +61,12 @@ class AppsSection:
         self.catalog.remove(app_id)
         self.table.update(self.catalog.entries)
         self.error = ''
+
+    def set_launch_mode(self, app_id, launch_mode):
+        entry = self.catalog.set_launch_mode(app_id, launch_mode)
+        self.table.update(self.catalog.entries)
+        self.error = ''
+        return entry
 
     @property
     def entries(self):
@@ -103,7 +110,9 @@ class AppsSection:
         description_end = height - 6
         if self.selected_entry:
             entry = self.selected_entry
-            lines = textwrap.wrap(entry.description or shlex.join(entry.command), width=available)
+            mode = 'Graphical window' if entry.launch_mode == 'graphical' else 'Terminal app'
+            lines = textwrap.wrap(mode + ': ' + (entry.description or shlex.join(entry.command)),
+                                  width=available)
             for row, line in enumerate(lines, description_start):
                 if row > description_end:
                     break
@@ -111,7 +120,7 @@ class AppsSection:
         desktop.text(height - 5, 3,
                      fit('Search: ' + (self.query or '[all apps]'), available, desktop.width),
                      curses.A_DIM)
-        desktop.text(height - 4, 2, 'N Add | I Install | D Remove | R Reload | / Search')
+        desktop.text(height - 4, 2, 'N Add | I Install | M Mode | D Del | R Reload | / Find')
 
     def render_compact(self, desktop, width):
         entry = self.selected_entry

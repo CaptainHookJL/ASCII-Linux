@@ -1,11 +1,38 @@
 #!/bin/sh
-# Desktop runs with the permissions of the logged-in user.
-cd /usr/lib/ascii-linux || exit 1
-export PYTHONDONTWRITEBYTECODE=1
-/usr/bin/python3 -m desktop.main "$@"
+# Use the current graphical session, or start our own from a console login.
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
+mode=auto
+case "${1:-}" in
+    --console) mode=console; shift ;;
+    --graphical) mode=graphical; shift ;;
+esac
+if [ "$mode" = console ]; then
+    exec "$SCRIPT_DIR/ascii-console" "$@"
+fi
+if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+    if [ "$mode" = graphical ]; then
+        printf 'A graphical session is already running. Use ascii-session or ascii-session --console in its terminal.\n' >&2
+        exit 1
+    fi
+    exec "$SCRIPT_DIR/ascii-console" "$@"
+fi
+case "$(tty 2>/dev/null)" in
+    /dev/tty[0-9]*) ;;
+    *)
+        printf 'A dedicated graphical session requires a local Linux console. Starting the ASCII console.\n' >&2
+        exec "$SCRIPT_DIR/ascii-console" "$@"
+        ;;
+esac
+for tool in startx xauth openbox xterm dbus-run-session xsetroot xprop; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        printf 'Missing graphical session tool: %s. Starting the ASCII console.\n' "$tool" >&2
+        exec "$SCRIPT_DIR/ascii-console" "$@"
+    fi
+done
+startx "$SCRIPT_DIR/ascii-xsession" "$@" -- -nolisten tcp
 status=$?
 if [ "$status" -ne 0 ]; then
-    printf '\nASCII desktop failed (status %s). Starting a recovery shell.\n' "$status" >&2
-    exec /bin/bash --noprofile --norc
+    printf '\nGraphical session failed (status %s). Starting the ASCII console.\n' "$status" >&2
+    exec "$SCRIPT_DIR/ascii-console" "$@"
 fi
 exit "$status"

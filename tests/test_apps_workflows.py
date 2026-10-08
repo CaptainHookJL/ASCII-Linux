@@ -15,6 +15,8 @@ def add_app(terminal, name, command, description=''):
     terminal.send('\x15' + command + '\r')
     terminal.wait('description (optional)')
     terminal.send('\x15' + description + '\r')
+    terminal.wait('Launch mode:')
+    terminal.send('\x15t\r')
     terminal.wait('App added: ' + name)
 
 

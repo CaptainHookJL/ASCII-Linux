@@ -3,8 +3,10 @@ F1: launcher. F2: files. F3: Bash (exit returns to desktop).
 F4: system information. F9: text editor. F10: power menu. Esc: back.
 F11: processes. F12: network information. Built-in tools stay in the F1 menu.
 Apps: A from the desktop or F1 menu opens your saved launchers, initially empty.
-In full Apps, N adds a name, command and optional description; D removes a
-launcher after confirmation without uninstalling its program; R reloads.
+In full Apps, N adds a name, command, optional description and launch mode;
+choose g for graphical windows or t for terminal apps. M changes a saved mode.
+D removes a launcher after confirmation without uninstalling its program;
+R reloads.
 I installs from a pasted Bash command, then saves a separate launch command.
 Review both commands; Y runs, N/Esc cancels. Installer runs in your home with
 pipefail and may ask for sudo. Only exit 0 adds the launcher; failed/interrupted
@@ -18,11 +20,15 @@ automatically, and Apps does not scan .desktop files.
 Brave official instructions: https://brave.com/linux/
 I installer: curl -fsS https://dl.brave.com/install.sh | sh
 Launch command: brave-browser. On a host, install curl if missing:
-sudo apt install curl. Brave needs an existing graphical Linux session.
-The text-only ISO has no X11/Wayland server; Brave installation/GUI is unvalidated.
+sudo apt install curl. Choose graphical launch mode (g) for Brave.
+The live session uses X11/Openbox with a frameless ASCII desktop in xterm.
+Regular graphical apps open separate windows while the desktop stays usable.
+Alt+Tab switches windows; Super+D returns to the ASCII desktop.
+Brave installation/startup remains unvalidated; it is not installed by default.
 Launchers save in ${XDG_DATA_HOME:-~/.local/share}/ascii-linux/apps.json;
 relative XDG paths use ~/.local/share. JSON entries have id, name, command
-(argument list) and description; adding through the Apps UI is recommended.
+(argument list), description and launch_mode (terminal or graphical).
+Older entries default to terminal; adding through the Apps UI is recommended.
 Wide terminals show a desktop Apps panel; narrow terminals show an Apps strip.
 Files: F5 copy, F6 move, F7 mkdir, F8 delete (permanent, confirmation),
 N rename, / search filenames, E edit selected file.
@@ -33,4 +39,6 @@ Processes: / search, S sort, Enter inspect, K confirmed SIGTERM, R refresh.
 Network: arrows select, Enter details, R refresh. Connection changes are deferred.
 This is a live prototype: changes are not persistent by default.
 For recovery use Ctrl+Alt+F2, or edit the boot command to add ascii.safe.
+ascii.console starts the ASCII interface without X11. Graphical launchers need
+a display; they cannot open windows in this console recovery mode.
 There is no disk installer yet. Do not use this prototype for sensitive data.
