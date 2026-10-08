@@ -1,10 +1,13 @@
 """Cursor and clipping checks for Unicode and ASCII fallback rendering."""
 import curses
 import unittest
+from unittest import mock
 
+from desktop.apps.catalog import Application
 from desktop.apps.text_editor import TextEditor
 from desktop.core.desktop import Desktop
 from desktop.widgets.dialog import Dialog
+from desktop.widgets.apps import AppsSection
 
 
 class DrawingScreen:
@@ -31,6 +34,23 @@ def desktop_for_drawing(ascii_only=False, width=110):
 
 
 class UnicodeRenderingTests(unittest.TestCase):
+    def test_user_app_wide_names_and_descriptions_stay_inside_home_panel(self):
+        catalog = mock.Mock()
+        catalog.load.return_value = [Application('mine', '界' * 50, ('true',), '界' * 70)]
+        apps = AppsSection(catalog)
+        for height, width in ((16, 86), (20, 86), (28, 110)):
+            for ascii_only in (False, True):
+                with self.subTest(height=height, width=width, ascii_only=ascii_only):
+                    desktop = desktop_for_drawing(ascii_only, width)
+                    desktop.screen.size = height, width
+                    apps.render_home(desktop, height, width)
+                    right_border = width - 5
+                    content = [(x, text) for _, x, text, _ in desktop.screen.drawn
+                               if 42 < x < right_border]
+                    self.assertTrue(content)
+                    for x, text in content:
+                        self.assertLessEqual(x + desktop.width(text), right_border)
+
     def test_editor_cursor_aligns_with_wide_and_combining_text(self):
         for ascii_only, content, rendered, cells in [
                 (False, '漢字', '漢字', 4),

@@ -23,17 +23,33 @@ Editor history tests cover saved baselines, cursor/content restoration and memor
 
 Check the Apps section in both a 60-column terminal and one at least 86 columns
 wide: the desktop should show an Apps strip or panel, respectively, and selection
-should remain visible after resizing. Use arrows and Tab to select each built-in
-app, then Enter to open it. Open the full Apps page with A from the desktop and
-F1 menu, and through the Apps menu entry. Search for an app name, description or
-shortcut, clear the search, and check an unmatched query. Esc returns to the
-desktop. Confirm that app descriptions and the search/keyboard hints fit at the
-supported minimum size of 60 columns by 16 rows.
+should remain visible after resizing. A fresh catalog should show an empty Apps
+list, while Files, Text editor, Terminal, System information, Processes and
+Network remain available through F1 and their function keys. Open full Apps with
+A from the desktop and F1 menu, and through the Apps menu entry. Press N and
+register a harmless command with a name and optional description; for example,
+use `python3 /home/jacob/my-app/main.py` after creating that script. Use arrows
+and Tab to select it, then Enter to launch and check the return to the desktop.
+Confirm execution uses the user's home directory and that a path with spaces
+works when quoted. Scripts must be executable or use an interpreter command.
+
+Search for a name, description or command, clear the search, and check an
+unmatched query. R reloads the catalog. Restart the desktop to check persistence
+in `${XDG_DATA_HOME:-~/.local/share}/ascii-linux/apps.json`; relative XDG paths
+should use the default under `~/.local/share`. D requests confirmed removal:
+cancel once, then confirm and verify the launcher is gone while its program
+remains. Registration must not install software or scan `.desktop` files.
+Esc returns to the desktop. Confirm descriptions and keyboard hints fit at the
+supported minimum size of 60 columns by 16 rows. Use a temporary catalog/home
+when testing so existing user launchers are preserved.
 
 After building, boot **both** QEMU firmware modes. Check that the bootloader loads,
 the live user reaches the desktop on tty1, F2 shows Welcome.txt, F3 returns after
 `exit`, F4 reports sensible data, and power-menu cancellation does nothing.
-Check Apps navigation and launching from the desktop and full Apps page.
+Check the initially empty Apps list, registration, navigation and launching from
+the desktop and full Apps page. Saved launchers should survive a desktop restart;
+the live image has no persistent storage by default and does not promise to
+retain them after a reboot.
 Test F9 and E from Files: edit and save Welcome.txt, create a new document,
 search, switch applications and return, and cancel an unsaved close. Test copy,
 rename, move, mkdir and confirmed deletion on disposable files in the live user's

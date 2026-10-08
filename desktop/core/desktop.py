@@ -8,7 +8,6 @@ import time
 import unicodedata
 
 from desktop.apps.file_manager import FileManager, preview
-from desktop.apps.catalog import APPLICATIONS
 from desktop.apps.text_editor import TextEditor
 from desktop.core.system_views import SystemApps
 from desktop.utils.jobs import FileJob
@@ -31,8 +30,9 @@ LINUX_COMPACT = [
     '|    |  | \\| | |  X ',
     '|__ ___ |  | |_| / \\',
 ]
-APPS = [(app.name, app.page) for app in APPLICATIONS] + [
-    ('Apps', 'apps'), ('Help / About', 'help'), ('Power / Logout', 'power')]
+APPS = [('Files', 'files'), ('Text editor', 'editor'), ('Terminal', 'shell'),
+        ('System information', 'system'), ('Processes', 'processes'), ('Network', 'network'),
+        ('Apps', 'apps'), ('Help / About', 'help'), ('Power / Logout', 'power')]
 
 
 def clean(text):
@@ -206,9 +206,7 @@ class Desktop:
             if w >= 86:
                 self.apps.render_home(self, h, w)
             else:
-                app = self.apps.selected_entry
-                name = f'{app.name} [{app.shortcut}]' if app else 'Browse apps'
-                self.text(3, 3, f'Apps [A] > {name} | Enter Open', curses.A_BOLD)
+                self.apps.render_compact(self, w)
         elif self.page == 'apps':
             self.apps.render(self, h, w)
         elif self.page in ('menu', 'power'):
@@ -243,11 +241,14 @@ class Desktop:
             lines = self.view_lines()
             for y, line in enumerate(lines[self.offset:self.offset + h - 8], 4):
                 self.text(y, 3, line)
-        self.text(h - 2, 1, self.system_apps.detail_warning(self.page) or self.message)
+        app_error = self.apps.error if self.page in ('apps', 'home') else ''
+        self.text(h - 2, 1, self.system_apps.detail_warning(self.page) or app_error or self.message)
         footer = ('F5 Next match | F6 Save as | Esc/Ctrl+Q Close | F1 Menu | F2 Files'
                   if self.page == 'editor' else
                   'A Apps | F1 Menu | F2 Files | F3 Shell | F4 System | F9 Editor'
                   if self.page == 'home' else
+                  'Arrows/Tab Select | Esc Desktop'
+                  if self.page == 'apps' else
                   'F1 Menu | F2 Files | F3 Shell | F4 System | F9 Editor | F10 Power')
         self.text(h - 1, 0, footer)
         if self.dialog:
@@ -261,11 +262,11 @@ class Desktop:
             pass
         self.screen.refresh()
 
-    def external(self, command):
+    def external(self, command, cwd=None):
         curses.def_prog_mode()
         curses.endwin()
         try:
-            result = subprocess.run(command, check=False)
+            result = subprocess.run(command, check=False, cwd=cwd)
             self.message = f'{command[0]} exited with status {result.returncode}'
         except OSError as error:
             self.message = str(error)
@@ -336,7 +337,9 @@ class Desktop:
                           'F1 Menu, F2 Files, F3 Bash, F4 System, F9 Editor, F10 Power.',
                           'F11 Processes, F12 Network (also available in F1 Menu).',
                           'Home: Apps section uses arrows/Tab and Enter; A browses all.',
-                          'Apps: / search, arrows/Tab select, Enter open, Esc desktop.',
+                          'Apps contains your added apps; system tools are in F1 Menu.',
+                          'Apps: N add, D remove launcher, R reload, / search.',
+                          'Apps: arrows/Tab select, Enter run, Esc desktop.',
                           'Files: Enter previews; E edits; Backspace goes to parent.',
                           'H toggles hidden files; R refreshes; / filters filenames.',
                           'F5 Copy, F6 Move, F7 Mkdir, F8 Delete, N Rename.',
@@ -474,10 +477,20 @@ class Desktop:
         app = self.apps.selected_entry
         if app is None:
             return
-        if app.page == 'shell':
-            self.external(['/bin/bash', '-l'])
-        else:
-            self.open_page(app.page)
+        self.external(app.command, cwd=Path.home())
+
+    def add_app(self):
+        name = self.prompt('Add app: name')
+        if name is None or not name.strip():
+            return
+        command = self.prompt('Add app: command (quote paths with spaces)')
+        if command is None:
+            return
+        description = self.prompt('Add app: description (optional)')
+        if description is None:
+            return
+        entry = self.apps.add(name, command, description)
+        self.message = 'App added: ' + entry.name
 
     def handle_apps(self, key):
         if key in (curses.KEY_UP, curses.KEY_LEFT, curses.KEY_DOWN, curses.KEY_RIGHT):
@@ -490,6 +503,16 @@ class Desktop:
             query = self.prompt('Search apps', self.apps.query)
             if query is not None:
                 self.apps.set_query(query)
+        elif self.page == 'apps' and key in ('n', 'N'):
+            self.add_app()
+        elif self.page == 'apps' and key in ('d', 'D'):
+            entry = self.apps.selected_entry
+            if entry and self.confirm(f'Remove launcher for {entry.name}? The app files will be kept.'):
+                self.apps.remove(entry.id)
+                self.message = 'Launcher removed: ' + entry.name
+        elif self.page == 'apps' and key in ('r', 'R'):
+            self.apps.refresh()
+            self.message = 'Apps reloaded'
 
     def handle(self, key):
         if self.job:

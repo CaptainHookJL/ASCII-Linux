@@ -3,13 +3,19 @@
 `desktop/main.py` parses options and owns terminal initialization/restoration.
 `desktop/core/desktop.py` renders the status bar, framed views, launcher, keyboard
 controls, confirmation dialogs, and shell suspension/resumption.
-`desktop/apps/catalog.py` defines the six immutable built-in app entries, their
-page destinations, descriptions and keyboard shortcuts.
+`desktop/apps/catalog.py` validates, loads and saves the user's launcher catalog
+at `${XDG_DATA_HOME:-~/.local/share}/ascii-linux/apps.json`, ignoring relative XDG
+paths. Each JSON record has an id, name, command argument list and description.
+It parses entered commands with POSIX `shlex`, uses atomic saves and checks for
+external changes. It does not install or execute applications.
 `desktop/widgets/apps.py` renders the desktop Apps panel and full Apps page using
-the shared table selection/filtering model. It follows terminal size, preserves
-catalog order, and leaves application startup to the desktop controller.
-`tests/test_apps_workflows.py` exercises launching, searching, and preserving an
-editor document through the Apps section in real terminals.
+the shared table selection/filtering model. It follows terminal size, sorts
+entries alphabetically by name, and leaves application startup to the desktop controller.
+The desktop controller handles adding/removing launchers and runs their commands
+without an implicit shell, with the user's home as the working directory, while
+suspending and restoring curses. Built-in tools keep their F1 and function-key
+routes and are separate from the initially empty user Apps list.
+`tests/test_apps_workflows.py` exercises the Apps section in real terminals.
 `desktop/apps/file_manager.py` implements directory navigation, name filtering,
 file/directory mutations, and safe previews. It uses Linux libc's `renameat2`
 with NOREPLACE to publish copies and move directories without racing another

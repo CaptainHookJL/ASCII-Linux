@@ -22,24 +22,46 @@ python3 -m unittest discover -s tests -v
 No pip packages are required. Use a terminal of at least 60 columns by 16 rows.
 F1 opens the launcher, F2 opens Files, F3 launches Bash, F4 opens system information,
 F9 opens or resumes the text editor, F10 opens the power menu, F11 opens Processes,
-and F12 opens Network. All apps are also available through F1. Press `A` on the
-desktop or in the F1 menu to open the Apps section. Arrows
+and F12 opens Network. These built-in tools remain available through F1. Press `A`
+on the desktop or in the F1 menu to open your Apps section. Arrows
 navigate and Enter selects. Esc goes back; Ctrl+Q closes the editor or asks to
 leave the desktop. Type `exit` in Bash to return to the desktop.
 Power actions require confirmation and normal sudo authorization.
 
 ## Apps
 
-The desktop has an Apps panel when the terminal is at least 86 columns wide,
-and a compact Apps strip in narrower terminals. Use arrows or Tab to select an
-app and Enter to open it. `A` opens the full Apps page; the F1 menu also has an
-Apps entry. The page shows keyboard shortcuts and a description of the selected
-app. `/` searches names, descriptions and shortcuts; empty input clears the
-search. Esc returns to the desktop.
+Apps is your list of saved launchers and starts empty. Files, Text editor,
+Terminal, System information, Processes and Network stay in F1 and on their
+existing function keys. The desktop shows an Apps panel at 86 columns or wider,
+or a compact Apps strip in narrower terminals. Use arrows or Tab to select a
+saved app and Enter to launch it. `A` opens the full Apps page from the desktop
+or F1 menu; Esc returns to the desktop.
 
-Apps contains the six built-in applications: Files, Text editor, Terminal,
-System information, Processes and Network. It launches these applications;
-software installation remains available through Debian tools in Bash.
+The easiest way to register an app is to open Apps and press `N`. Enter a name,
+command and optional description. For example, name it `My app` and enter:
+
+```sh
+python3 /home/jacob/my-app/main.py
+```
+
+On the full Apps page, `D` asks to remove the selected saved launcher; it does
+not uninstall the program. `R` reloads saved entries. `/` searches names,
+descriptions and commands; empty input clears the search. Registration does
+not install packages or discover `.desktop` files automatically. Install the
+program separately through Bash or Debian's package tools.
+
+Commands are split into arguments with POSIX `shlex` and run from your home
+directory without an implicit shell. Quote paths containing spaces, for example
+`python3 "/home/jacob/My App/main.py"`. Scripts need an executable bit or an
+interpreter command such as `python3` or `bash`. If you need shell syntax,
+explicitly use a command such as `bash -lc 'your command here'`.
+
+Launchers persist in `${XDG_DATA_HOME:-~/.local/share}/ascii-linux/apps.json`;
+a relative `XDG_DATA_HOME` is ignored in favor of `~/.local/share`. The file is
+a JSON list of records with `id`, `name`, `command` (a list of argument strings)
+and `description`. Prefer the Apps UI to editing this file. The live ISO has no
+persistent storage by default, so saved launchers there last only for that live
+session unless persistence is configured separately.
 
 ## Files and Text editor
 

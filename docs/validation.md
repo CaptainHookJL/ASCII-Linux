@@ -2,10 +2,11 @@
 
 Executed in a Debian 13 amd64 cloud container:
 
-- All 103 unittest tests passed, with no skips or disabled cases: 42 earlier
+- All 126 unittest tests passed, with no skips or disabled cases: 42 earlier
   file/editor/system/widget/terminal checks; 18 editor-history tests; 18 process
   tests; 13 network tests; two polling tests; four system-view regressions;
-  three extended real-terminal workflows; and three Apps-section workflows.
+  three extended real-terminal workflows; 21 user-app catalog tests; four
+  Apps-section workflows; and one Unicode Apps-panel regression.
 - File tests exercise copy/move/rename/mkdir/name filtering/deletion, source
   preservation after failures, collision races, staging cleanup, symbolic links,
   directory trees, local FIFO moves, simulated cross-device move fallback, and
@@ -32,11 +33,17 @@ Executed in a Debian 13 amd64 cloud container:
 - Terminal workflows cover existing files/editor/Bash/power cancellation plus
   F1/F11/F12 navigation, sorting/search/inspection, network details/scrolling,
   confirmed child termination, and undo/redo around actual file saves.
-- Apps workflows launch all six built-in tools, search by name/shortcut, recover
-  from empty results, navigate through the home section and F1 menu, and preserve
-  unsaved editor buffers across app switches before saving actual files. ASCII,
-  Unicode, and 60-by-16 terminal modes passed. Manual rendering checks passed at
-  30 supported terminal sizes with both ASCII and LINUX artwork intact.
+- Apps starts empty and contains only user-registered launchers. Catalog tests
+  cover persistence, quoted/literal arguments, Unicode, XDG paths, malformed
+  records, external changes, write failures and temporary-file cleanup.
+  Terminal workflows register and execute real user commands, check the home
+  working directory, reload after restart, cancel/confirm launcher removal while
+  preserving app files, scroll longer lists, search/cancel, recover from missing
+  executables, and preserve unsaved editor buffers before saving actual files.
+  Built-in tools remain in F1 and on their function keys. ASCII, Unicode, and
+  60-by-16 terminal modes passed. Manual rendering checks covered empty and
+  populated catalogs at 30 supported terminal sizes with both logos intact;
+  a regression checks that wide Unicode descriptions stay inside the panel.
 - `python3 -m desktop.main --check` and build/integration shell syntax checks passed.
 
 ISO build was previously attempted and stopped at the root prerequisite. This

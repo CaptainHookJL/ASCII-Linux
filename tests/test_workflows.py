@@ -20,7 +20,8 @@ class Terminal:
         self.process = subprocess.Popen(
             ['python3', '-m', 'desktop.main'] + (['--ascii'] if ascii_only else []),
             stdin=slave, stdout=slave, stderr=slave, start_new_session=True,
-            env=dict(os.environ, TERM='xterm-256color', HOME=str(home), LANG='C.UTF-8'))
+            env=dict(os.environ, TERM='xterm-256color', HOME=str(home), LANG='C.UTF-8',
+                     XDG_DATA_HOME=str(Path(home) / '.local' / 'share')))
         os.close(slave)
         self.output = bytearray()
 

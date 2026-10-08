@@ -1,9 +1,18 @@
 Welcome to ASCII Linux 0.1.
 F1: launcher. F2: files. F3: Bash (exit returns to desktop).
 F4: system information. F9: text editor. F10: power menu. Esc: back.
-F11: processes. F12: network information. All apps are in the F1 menu.
-Apps: A from the desktop or F1 menu opens all six built-in apps.
-Arrows/Tab select, Enter opens, / searches the Apps page, Esc returns to desktop.
+F11: processes. F12: network information. Built-in tools stay in the F1 menu.
+Apps: A from the desktop or F1 menu opens your saved launchers, initially empty.
+In full Apps, N adds a name, command and optional description; D removes a
+launcher after confirmation without uninstalling its program; R reloads.
+Arrows/Tab select, Enter launches, / searches names/descriptions/commands,
+Esc returns to desktop. Example command: python3 /home/jacob/my-app/main.py
+Commands run in your home without an implicit shell; quote paths with spaces.
+Scripts need executable permission or an interpreter; use bash -lc explicitly
+for shell syntax. Apps registers launchers; it does not install or scan programs.
+Launchers save in ${XDG_DATA_HOME:-~/.local/share}/ascii-linux/apps.json;
+relative XDG paths use ~/.local/share. JSON entries have id, name, command
+(argument list) and description; adding through the Apps UI is recommended.
 Wide terminals show a desktop Apps panel; narrow terminals show an Apps strip.
 Files: F5 copy, F6 move, F7 mkdir, F8 delete (permanent, confirmation),
 N rename, / search filenames, E edit selected file.
