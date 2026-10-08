@@ -16,6 +16,18 @@ from desktop.widgets.dialog import Dialog
 LOGO = ['    _    ____   ____ ___ ___', '   / \\  / ___| / ___|_ _|_ _|',
         '  / _ \\ \\___ \\| |    | | | |', ' / ___ \\ ___) | |___ | | | |',
         '/_/   \\_\\____/ \\____|___|___|']
+LINUX_LOGO = [
+    ' _       ___   _   _   _   _  __  __',
+    '| |     |_ _| | \\ | | | | | | \\ \\/ /',
+    '| |      | |  |  \\| | | | | |  \\  /',
+    '| |___   | |  | |\\  | | |_| |  /  \\',
+    '|_____| |___| |_| \\_|  \\___/  /_/\\_\\',
+]
+LINUX_COMPACT = [
+    '|   ___ |\\ | | | \\ /',
+    '|    |  | \\| | |  X ',
+    '|__ ___ |  | |_| / \\',
+]
 APPS = [('Files', 'files'), ('Text editor', 'editor'), ('Terminal', 'shell'),
         ('System information', 'system'), ('Help / About', 'help'), ('Power / Logout', 'power')]
 
@@ -172,8 +184,15 @@ class Desktop:
         elif self.page == 'home':
             for y, line in enumerate(LOGO, 4):
                 self.text(y, 3, line)
-            self.text(10, 3, 'ASCII Linux 0.1 — your console is your desktop.')
-            self.text(12, 3, 'F1 Menu | F2 Files | F3 Bash | F9 Text editor')
+            # Keep both words visible at the supported minimum terminal height.
+            linux_logo = LINUX_LOGO if h >= 20 else LINUX_COMPACT
+            linux_y = 10 if h >= 20 else 9
+            for y, line in enumerate(linux_logo, linux_y):
+                self.text(y, 3, line)
+            greeting_y = min(linux_y + len(linux_logo) + 1, h - 4)
+            self.text(greeting_y, 3, 'ASCII Linux 0.1 — your console is your desktop.')
+            if greeting_y + 2 <= h - 4:
+                self.text(greeting_y + 2, 3, 'F1 Menu | F2 Files | F3 Bash | F9 Text editor')
         elif self.page in ('menu', 'power'):
             items = [name for name, _ in APPS] if self.page == 'menu' else ['Cancel', 'Logout', 'Reboot', 'Shutdown']
             for i, item in enumerate(items):
