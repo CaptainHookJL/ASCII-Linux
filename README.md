@@ -22,10 +22,26 @@ python3 -m unittest discover -s tests -v
 No pip packages are required. Use a terminal of at least 60 columns by 16 rows.
 F1 opens the launcher, F2 opens Files, F3 launches Bash, F4 opens system information,
 F9 opens or resumes the text editor, F10 opens the power menu, F11 opens Processes,
-and F12 opens Network. All apps are also available through F1. Arrows
+and F12 opens Network. All apps are also available through F1. Press `A` on the
+desktop or in the F1 menu to open the Apps section. Arrows
 navigate and Enter selects. Esc goes back; Ctrl+Q closes the editor or asks to
 leave the desktop. Type `exit` in Bash to return to the desktop.
 Power actions require confirmation and normal sudo authorization.
+
+## Apps
+
+The desktop has an Apps panel when the terminal is at least 86 columns wide,
+and a compact Apps strip in narrower terminals. Use arrows or Tab to select an
+app and Enter to open it. `A` opens the full Apps page; the F1 menu also has an
+Apps entry. The page shows keyboard shortcuts and a description of the selected
+app. `/` searches names, descriptions and shortcuts; empty input clears the
+search. Esc returns to the desktop.
+
+Apps contains the six built-in applications: Files, Text editor, Terminal,
+System information, Processes and Network. It launches these applications;
+software installation remains available through Debian tools in Bash.
+
+## Files and Text editor
 
 Files supports folder navigation, parent navigation, hidden entries (`H`),
 refresh (`R`), permissions/owner/size/date, and bounded text previews. New controls:

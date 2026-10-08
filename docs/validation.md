@@ -2,10 +2,10 @@
 
 Executed in a Debian 13 amd64 cloud container:
 
-- All 100 unittest tests passed, with no skips or disabled cases: 42 earlier
+- All 103 unittest tests passed, with no skips or disabled cases: 42 earlier
   file/editor/system/widget/terminal checks; 18 editor-history tests; 18 process
   tests; 13 network tests; two polling tests; four system-view regressions;
-  and three extended real-terminal workflows.
+  three extended real-terminal workflows; and three Apps-section workflows.
 - File tests exercise copy/move/rename/mkdir/name filtering/deletion, source
   preservation after failures, collision races, staging cleanup, symbolic links,
   directory trees, local FIFO moves, simulated cross-device move fallback, and
@@ -32,6 +32,11 @@ Executed in a Debian 13 amd64 cloud container:
 - Terminal workflows cover existing files/editor/Bash/power cancellation plus
   F1/F11/F12 navigation, sorting/search/inspection, network details/scrolling,
   confirmed child termination, and undo/redo around actual file saves.
+- Apps workflows launch all six built-in tools, search by name/shortcut, recover
+  from empty results, navigate through the home section and F1 menu, and preserve
+  unsaved editor buffers across app switches before saving actual files. ASCII,
+  Unicode, and 60-by-16 terminal modes passed. Manual rendering checks passed at
+  30 supported terminal sizes with both ASCII and LINUX artwork intact.
 - `python3 -m desktop.main --check` and build/integration shell syntax checks passed.
 
 ISO build was previously attempted and stopped at the root prerequisite. This

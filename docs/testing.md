@@ -21,9 +21,19 @@ then send confirmed SIGTERM only to that child. They never signal pre-existing h
 processes. Backend fixtures cover races, permissions, unavailable data and rate resets.
 Editor history tests cover saved baselines, cursor/content restoration and memory caps.
 
+Check the Apps section in both a 60-column terminal and one at least 86 columns
+wide: the desktop should show an Apps strip or panel, respectively, and selection
+should remain visible after resizing. Use arrows and Tab to select each built-in
+app, then Enter to open it. Open the full Apps page with A from the desktop and
+F1 menu, and through the Apps menu entry. Search for an app name, description or
+shortcut, clear the search, and check an unmatched query. Esc returns to the
+desktop. Confirm that app descriptions and the search/keyboard hints fit at the
+supported minimum size of 60 columns by 16 rows.
+
 After building, boot **both** QEMU firmware modes. Check that the bootloader loads,
 the live user reaches the desktop on tty1, F2 shows Welcome.txt, F3 returns after
 `exit`, F4 reports sensible data, and power-menu cancellation does nothing.
+Check Apps navigation and launching from the desktop and full Apps page.
 Test F9 and E from Files: edit and save Welcome.txt, create a new document,
 search, switch applications and return, and cancel an unsaved close. Test copy,
 rename, move, mkdir and confirmed deletion on disposable files in the live user's

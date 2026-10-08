@@ -3,6 +3,13 @@
 `desktop/main.py` parses options and owns terminal initialization/restoration.
 `desktop/core/desktop.py` renders the status bar, framed views, launcher, keyboard
 controls, confirmation dialogs, and shell suspension/resumption.
+`desktop/apps/catalog.py` defines the six immutable built-in app entries, their
+page destinations, descriptions and keyboard shortcuts.
+`desktop/widgets/apps.py` renders the desktop Apps panel and full Apps page using
+the shared table selection/filtering model. It follows terminal size, preserves
+catalog order, and leaves application startup to the desktop controller.
+`tests/test_apps_workflows.py` exercises launching, searching, and preserving an
+editor document through the Apps section in real terminals.
 `desktop/apps/file_manager.py` implements directory navigation, name filtering,
 file/directory mutations, and safe previews. It uses Linux libc's `renameat2`
 with NOREPLACE to publish copies and move directories without racing another

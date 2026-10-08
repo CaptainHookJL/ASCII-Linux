@@ -8,11 +8,13 @@ import time
 import unicodedata
 
 from desktop.apps.file_manager import FileManager, preview
+from desktop.apps.catalog import APPLICATIONS
 from desktop.apps.text_editor import TextEditor
 from desktop.core.system_views import SystemApps
 from desktop.utils.jobs import FileJob
 from desktop.utils.system import CpuSampler, information, memory
 from desktop.widgets.dialog import Dialog
+from desktop.widgets.apps import AppsSection
 
 LOGO = ['    _    ____   ____ ___ ___', '   / \\  / ___| / ___|_ _|_ _|',
         '  / _ \\ \\___ \\| |    | | | |', ' / ___ \\ ___) | |___ | | | |',
@@ -29,9 +31,8 @@ LINUX_COMPACT = [
     '|    |  | \\| | |  X ',
     '|__ ___ |  | |_| / \\',
 ]
-APPS = [('Files', 'files'), ('Text editor', 'editor'), ('Terminal', 'shell'),
-        ('System information', 'system'), ('Processes', 'processes'), ('Network', 'network'),
-        ('Help / About', 'help'), ('Power / Logout', 'power')]
+APPS = [(app.name, app.page) for app in APPLICATIONS] + [
+    ('Apps', 'apps'), ('Help / About', 'help'), ('Power / Logout', 'power')]
 
 
 def clean(text):
@@ -71,6 +72,7 @@ class Desktop:
         self.editor_query = ''
         self.editor_return = 'home'
         self.system_apps = SystemApps(self)
+        self.apps = AppsSection()
 
     def display(self, text):
         text = clean(text)
@@ -172,7 +174,7 @@ class Desktop:
             self.text(1, 1, f'CPU {self.cpu_value:4.0f}% | RAM {used / total:4.0%} | {time.strftime("%H:%M:%S")}')
         except OSError:
             self.text(1, 1, time.strftime('%H:%M:%S'))
-        title = {'home': 'Desktop', 'menu': 'Application launcher', 'files': str(self.browser.path),
+        title = {'home': 'Desktop', 'menu': 'Application launcher', 'apps': 'Apps', 'files': str(self.browser.path),
                  'system': 'System information', 'preview': 'File preview', 'help': 'Help / About',
                  'power': 'Power / Logout', 'editor': 'Text editor',
                  'processes': 'Processes', 'process_details': 'Process inspection',
@@ -196,9 +198,19 @@ class Desktop:
             for y, line in enumerate(linux_logo, linux_y):
                 self.text(y, 3, line)
             greeting_y = min(linux_y + len(linux_logo) + 1, h - 4)
-            self.text(greeting_y, 3, 'ASCII Linux 0.1 — your console is your desktop.')
+            greeting = ('your console is your desktop.' if w >= 86 else
+                        'ASCII Linux 0.1 — your console is your desktop.')
+            self.text(greeting_y, 3, greeting)
             if greeting_y + 2 <= h - 4:
-                self.text(greeting_y + 2, 3, 'F1 Menu | F2 Files | F3 Bash | F9 Text editor')
+                self.text(greeting_y + 2, 3, 'A Apps | Arrows/Tab | Enter Open')
+            if w >= 86:
+                self.apps.render_home(self, h, w)
+            else:
+                app = self.apps.selected_entry
+                name = f'{app.name} [{app.shortcut}]' if app else 'Browse apps'
+                self.text(3, 3, f'Apps [A] > {name} | Enter Open', curses.A_BOLD)
+        elif self.page == 'apps':
+            self.apps.render(self, h, w)
         elif self.page in ('menu', 'power'):
             items = [name for name, _ in APPS] if self.page == 'menu' else ['Cancel', 'Logout', 'Reboot', 'Shutdown']
             for i, item in enumerate(items):
@@ -234,6 +246,8 @@ class Desktop:
         self.text(h - 2, 1, self.system_apps.detail_warning(self.page) or self.message)
         footer = ('F5 Next match | F6 Save as | Esc/Ctrl+Q Close | F1 Menu | F2 Files'
                   if self.page == 'editor' else
+                  'A Apps | F1 Menu | F2 Files | F3 Shell | F4 System | F9 Editor'
+                  if self.page == 'home' else
                   'F1 Menu | F2 Files | F3 Shell | F4 System | F9 Editor | F10 Power')
         self.text(h - 1, 0, footer)
         if self.dialog:
@@ -298,7 +312,7 @@ class Desktop:
         if self.unsaved() and not self.confirm('Discard unsaved changes and open another document?'):
             return
         if self.page != 'editor':
-            self.editor_return = self.page if self.page in ('files', 'home', 'menu') else 'home'
+            self.editor_return = self.page if self.page in ('files', 'home', 'menu', 'apps') else 'home'
         self.editor = replacement
         self.editor_top = self.editor_left = 0
         self.editor_query = ''
@@ -313,12 +327,16 @@ class Desktop:
             return
         self.page, self.choice, self.offset, self.message = page, 0, 0, ''
         self.system_apps.opened(page)
+        if page == 'home':
+            self.apps.set_query('')
         if page == 'files':
             self.browser.refresh()
         elif page == 'help':
             self.lines = ['ASCII Linux 0.1 — Debian-based console desktop.',
                           'F1 Menu, F2 Files, F3 Bash, F4 System, F9 Editor, F10 Power.',
                           'F11 Processes, F12 Network (also available in F1 Menu).',
+                          'Home: Apps section uses arrows/Tab and Enter; A browses all.',
+                          'Apps: / search, arrows/Tab select, Enter open, Esc desktop.',
                           'Files: Enter previews; E edits; Backspace goes to parent.',
                           'H toggles hidden files; R refreshes; / filters filenames.',
                           'F5 Copy, F6 Move, F7 Mkdir, F8 Delete, N Rename.',
@@ -452,6 +470,27 @@ class Desktop:
                 self.lines = preview(path)
                 self.page, self.offset = 'preview', 0
 
+    def launch_app(self):
+        app = self.apps.selected_entry
+        if app is None:
+            return
+        if app.page == 'shell':
+            self.external(['/bin/bash', '-l'])
+        else:
+            self.open_page(app.page)
+
+    def handle_apps(self, key):
+        if key in (curses.KEY_UP, curses.KEY_LEFT, curses.KEY_DOWN, curses.KEY_RIGHT):
+            self.apps.move(-1 if key in (curses.KEY_UP, curses.KEY_LEFT) else 1)
+        elif key == '\t':
+            self.apps.next()
+        elif key in ('\n', '\r', curses.KEY_ENTER):
+            self.launch_app()
+        elif key == '/' and self.page == 'apps':
+            query = self.prompt('Search apps', self.apps.query)
+            if query is not None:
+                self.apps.set_query(query)
+
     def handle(self, key):
         if self.job:
             self.message = 'Operation in progress; please wait.'
@@ -474,6 +513,8 @@ class Desktop:
             self.open_page('network')
         elif self.page == 'editor':
             self.handle_editor(key)
+        elif self.page in ('home', 'menu') and key in ('a', 'A'):
+            self.open_page('apps')
         elif key == '\x11':
             question = 'Leave ASCII desktop and discard unsaved changes?' if self.unsaved() else 'Leave ASCII desktop?'
             if self.confirm(question):
@@ -503,6 +544,8 @@ class Desktop:
                             self.running = False
                         else:
                             self.external(['sudo', '/usr/bin/systemctl', action])
+        elif self.page in ('apps', 'home'):
+            self.handle_apps(key)
         elif self.page == 'files':
             self.handle_files(key)
         elif self.page in ('processes', 'process_details', 'network', 'network_details'):
