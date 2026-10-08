@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+build/work/
+build/output/
+*.iso
+*.img
+*.qcow2
+*.log

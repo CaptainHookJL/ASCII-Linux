@@ -1,0 +1,11 @@
+#!/bin/sh
+# Desktop runs with the permissions of the logged-in user.
+cd /usr/lib/ascii-linux || exit 1
+export PYTHONDONTWRITEBYTECODE=1
+/usr/bin/python3 -m desktop.main "$@"
+status=$?
+if [ "$status" -ne 0 ]; then
+    printf '\nASCII desktop failed (status %s). Starting a recovery shell.\n' "$status" >&2
+    exec /bin/bash --noprofile --norc
+fi
+exit "$status"

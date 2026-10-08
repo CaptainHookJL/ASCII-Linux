@@ -1,0 +1,14 @@
+name: Desktop tests
+on: [push, pull_request]
+jobs:
+  desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m desktop.main --check
+      - run: python3 -m unittest discover -s tests -v
+      - run: bash -n build/build-iso.sh build/clean.sh build/test-qemu.sh
+      - run: sh -n system/ascii-session system/profile/ascii-session.sh live-build/config/hooks/live/0100-branding.hook.chroot

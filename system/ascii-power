@@ -1,0 +1,2 @@
+# No general passwordless privilege; only these exact live power commands.
+ascii ALL=(root) NOPASSWD: /usr/bin/systemctl reboot, /usr/bin/systemctl poweroff

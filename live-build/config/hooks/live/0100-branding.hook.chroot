@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+# /etc/os-release may be a symlink to Debian's file: replace only the symlink.
+rm -f /etc/os-release
+cat > /etc/os-release <<'EOF'
+NAME="ASCII Linux"
+PRETTY_NAME="ASCII Linux 0.1"
+ID=asciilinux
+ID_LIKE=debian
+VERSION="0.1 (Debian trixie)"
+VERSION_ID="0.1"
+EOF
+printf 'ascii-linux\n' > /etc/hostname
+# The image is console-only; getty and normal Linux login own the session.
+systemctl set-default multi-user.target
+visudo -cf /etc/sudoers.d/ascii-power
