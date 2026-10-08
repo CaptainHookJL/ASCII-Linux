@@ -5,8 +5,8 @@ Python/curses desktop. No X11, Wayland, or graphical desktop is installed.
 Debian supplies the kernel, systemd, apt, networking, and device support.
 ASCII Linux supplies the console desktop, session startup, branding, and image
 build configuration. This repository implements the live-system prototype and its next desktop
-milestone: file operations and a built-in text editor, from the ASCII Linux
-Distribution Specification.
+milestones: file operations, a built-in text editor, process management and network
+information, from the ASCII Linux Distribution Specification.
 
 ## Run the desktop now
 
@@ -21,7 +21,8 @@ python3 -m unittest discover -s tests -v
 
 No pip packages are required. Use a terminal of at least 60 columns by 16 rows.
 F1 opens the launcher, F2 opens Files, F3 launches Bash, F4 opens system information,
-F9 opens or resumes the text editor, and F10 opens the power menu. Arrows
+F9 opens or resumes the text editor, F10 opens the power menu, F11 opens Processes,
+and F12 opens Network. All apps are also available through F1. Arrows
 navigate and Enter selects. Esc goes back; Ctrl+Q closes the editor or asks to
 leave the desktop. Type `exit` in Bash to return to the desktop.
 Power actions require confirmation and normal sudo authorization.
@@ -49,6 +50,7 @@ Deletion is permanent and has no trash/undo in this milestone.
 | --- | --- |
 | Ctrl+S / F6 | Save / save under a new name |
 | Ctrl+O / Ctrl+N | Open file / new document |
+| Ctrl+Z / Ctrl+Y | Undo / redo |
 | Ctrl+F / F5 | Find text / next match (wraps) |
 | Arrows, Home/End, Page Up/Down | Move cursor |
 | Backspace / Delete / Tab | Remove text / remove next character / insert four spaces |
@@ -61,11 +63,48 @@ existing saves retain permissions and ownership. Binary files, invalid UTF-8,
 and mixed line endings are refused with an error instead of altered. Use F6 to
 save an edited read-only document under a new name. Ctrl+U clears dialog input.
 Switching applications preserves the editor buffer; logout and power actions
-warn about any unsaved buffer. Undo/redo and clipboard integration are future work.
+warn about any unsaved buffer. Undo/redo restores content and cursor position;
+the modified flag follows the last successfully saved text, including across saves.
+History retains up to 50 edits (100 before/after snapshots) and 8 MiB of UTF-8
+snapshot text; oldest edits expire at those bounds. Clipboard integration is future work.
 
 The system page shows CPU model, memory, root disk usage, uptime, load, kernel,
 and network interface states. The top bar samples CPU and memory once per second,
 including while a dialog or filesystem operation is active.
+
+## Processes and Network
+
+Processes (`F11` or F1 Menu) shows PID, user, CPU%, memory%, state and command.
+CPU percentages use the top convention: 100% is one fully occupied core; the
+first snapshot establishes a baseline and displays 0%. A background snapshot
+updates about once per second while the app is visible.
+
+| In Processes | Action |
+| --- | --- |
+| Arrows / Page Up/Down / Home/End | Select and scroll |
+| `/` | Search PID, user, state or command; empty input clears |
+| S | Cycle CPU, memory, PID, user and command sorting |
+| Enter | Inspect process identity, resources, executable and working directory |
+| K | Confirm sending SIGTERM to the selected process |
+| R / Esc | Refresh / return |
+
+Termination sends only SIGTERM, with normal OS permissions and no sudo escalation.
+PID 1 and the desktop itself are protected. Linux pidfds and process start times
+prevent a changed/reused PID from receiving a signal. Exited processes and denied
+operations show an error. SIGTERM is a request; a program may handle or ignore it.
+
+Network (`F12` or F1 Menu) lists Ethernet, Wi-Fi and other interfaces, state, and
+receive/send rates. Arrows select; Enter shows MAC, IPv4/IPv6 addresses, default
+gateways, DNS resolvers and byte totals. Details wrap and scroll on narrow screens.
+R requests a new snapshot; Esc returns. Reads run in a background worker about
+every two seconds. First-sample rates are 0; later rates use counter differences.
+Warnings distinguish unavailable information from a disconnected/unconfigured
+interface. DNS reflects `/etc/resolv.conf`, which may point to a local resolver.
+
+This milestone displays network information only; Wi-Fi connection management
+is deferred. It uses the image's existing iproute2 tools, with Linux fallbacks
+when unavailable, and never changes host network settings. If your terminal
+intercepts F11/F12, select the app through F1 instead.
 
 ## Build the live ISO
 

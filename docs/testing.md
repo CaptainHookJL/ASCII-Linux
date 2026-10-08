@@ -15,8 +15,11 @@ launch and exit Bash; cancel a reboot; and confirm logout. The extended PTY suit
 copies/moves/renames files, creates folders, filters names, cancels and confirms
 deletion, opens/edits/saves documents, searches, saves under another name, preserves
 buffers across application switches and terminal resizing, and cancels unsaved
-replacement/logout prompts. All filesystem changes use temporary directories. They do not invoke
-power actions, format disks, or change host configuration.
+replacement/logout prompts. All filesystem changes use temporary directories. They do not invoke power actions, format disks, or change host network configuration.
+Process termination tests create their own disposable child, cancel a signal first,
+then send confirmed SIGTERM only to that child. They never signal pre-existing host
+processes. Backend fixtures cover races, permissions, unavailable data and rate resets.
+Editor history tests cover saved baselines, cursor/content restoration and memory caps.
 
 After building, boot **both** QEMU firmware modes. Check that the bootloader loads,
 the live user reaches the desktop on tty1, F2 shows Welcome.txt, F3 returns after
@@ -24,7 +27,12 @@ the live user reaches the desktop on tty1, F2 shows Welcome.txt, F3 returns afte
 Test F9 and E from Files: edit and save Welcome.txt, create a new document,
 search, switch applications and return, and cancel an unsaved close. Test copy,
 rename, move, mkdir and confirmed deletion on disposable files in the live user's
-home directory. Re-run both firmware modes after desktop changes before releasing
+home directory. Test Ctrl+Z/Ctrl+Y across edits and saves. Open Processes through F1/F11, check
+sorting/search/inspection, and cancel termination. Only test a confirmed signal on
+a disposable process you launched for that check. Open Network through F1/F12,
+compare addresses with `ip address`, verify routes/DNS and scroll the detail view.
+Wi-Fi interface detection is implemented; Wi-Fi connection changes are deferred.
+Re-run both firmware modes after desktop changes before releasing
 an updated ISO; earlier images do not contain these changes.
 Check `cat /etc/os-release`, `whoami`, and `tty` from F3: ASCII Linux, ascii, tty1.
 Use Ctrl+Alt+F2 to confirm a recovery getty is reachable. Confirm reboot/shutdown

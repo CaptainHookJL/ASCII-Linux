@@ -2,33 +2,43 @@
 
 Executed in a Debian 13 amd64 cloud container:
 
-- 42 unittest tests passed: the original file/browser/system/ASCII and Unicode
-  terminal tests; 14 file-operation tests; 15 editor-model tests; four Unicode
-  widget tests; and four extended real-terminal workflows.
+- All 100 unittest tests passed, with no skips or disabled cases: 42 earlier
+  file/editor/system/widget/terminal checks; 18 editor-history tests; 18 process
+  tests; 13 network tests; two polling tests; four system-view regressions;
+  and three extended real-terminal workflows.
 - File tests exercise copy/move/rename/mkdir/name filtering/deletion, source
-  preservation after failures, collision races, copy staging cleanup, symbolic
-  links, directory trees, same-filesystem FIFO moves, cross-device move fallback,
-  and nonblocking previews. Cross-device fallback is simulated; this container's
-  filesystem setup does not independently establish real USB/mount behavior.
-- Editor tests exercise editing/cursor/search, UTF-8 and LF/CRLF round trips,
-  final newlines, repeat saves, mode preservation, existing-destination refusal,
-  external-change detection, read-only files, and special/binary/oversized input.
-- Real-terminal workflows edit and save actual temporary files, search, switch
-  applications, save under another name, cancel and confirm deletion, cancel
-  unsaved document replacement/logout, recover from invalid home-directory input,
-  and shrink/restore the terminal while a save dialog is open.
-- Unicode widget tests check CJK/combining cursor alignment, ASCII fallback, and
-  display-cell clipping/scrolling. Cursor columns count code points; full emoji
-  grapheme navigation and clipboard/undo are future work.
-- `python3 -m desktop.main --check` passed with real `/proc` and `/sys` information.
-- Bash/sh syntax checks passed for the build and integration scripts.
+  preservation after failures, collision races, staging cleanup, symbolic links,
+  directory trees, local FIFO moves, simulated cross-device move fallback, and
+  nonblocking previews. Real USB/cross-mount moves still need separate testing.
+- Editor tests exercise UTF-8/LF/CRLF round trips, final newlines, save conflicts,
+  permission preservation, unsupported input, and undo/redo of edits and cursors.
+  Undo across saves correctly restores the modified/saved state; failed edits and
+  saves preserve history. History is bounded by snapshot count and UTF-8 byte size.
+- Process tests cover stat parsing, CPU interval/memory data, filtering/sorting,
+  selection, inspection, exits, permissions, PID reuse, and pidfd-only SIGTERM.
+  Functional signal tests create their own child process, then terminate only
+  that child. The real-terminal test cancels first and confirms a signal afterward.
+  No pre-existing host process is signalled.
+- Network tests cover addresses, MAC/type/state, DNS, IPv4/IPv6/default/multipath
+  routes, traffic deltas/resets, absent tools, malformed data, and Linux fallbacks.
+  Real interface inspection passed without changing any connection settings.
+  Wi-Fi kind detection is covered by fixtures; physical Wi-Fi hardware and
+  connection changes have not been tested. Connection management is deferred.
+- Polling tests prove slow/erroring sources run outside the UI thread, apply
+  snapshots on the main thread, and retain previous data on failed refresh.
+- UI regressions check fresh process details without changing identity, immutable
+  termination capture during refresh, disappeared interfaces and scroll recovery,
+  visible refresh errors, and wrapped addresses without missing values.
+- Terminal workflows cover existing files/editor/Bash/power cancellation plus
+  F1/F11/F12 navigation, sorting/search/inspection, network details/scrolling,
+  confirmed child termination, and undo/redo around actual file saves.
+- `python3 -m desktop.main --check` and build/integration shell syntax checks passed.
 
 ISO build was previously attempted and stopped at the root prerequisite. This
-container runs as uid 1000, has no sudo/live-build/QEMU, no effective Linux
-capabilities, and forbids user namespace mapping (`/proc/self/uid_map` is read-only).
-No ISO artifact has been produced or boot-tested here. live-build configuration
+container has no root/mount/chroot capability and cannot create a usable user
+namespace. No ISO artifact has been produced or boot-tested here. live-build
 execution, chroot hooks, BIOS/UEFI boot, live autologin, firmware, and physical
-hardware remain **unverified**. A Debian amd64 VM with root and mount/chroot
-support is required to finish release checks. Follow README.md and docs/testing.md.
-Rebuild any earlier ISO to include the file manager and editor updates; source
-validation does not establish a bootable distribution release.
+hardware remain **unverified**. Use a Debian amd64 VM with root and mount/chroot
+support to finish release checks (README.md and docs/testing.md). Rebuild earlier
+images to include the updated desktop apps; source checks do not establish a
+bootable distribution release.

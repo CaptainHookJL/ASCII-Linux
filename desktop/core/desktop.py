@@ -9,6 +9,7 @@ import unicodedata
 
 from desktop.apps.file_manager import FileManager, preview
 from desktop.apps.text_editor import TextEditor
+from desktop.core.system_views import SystemApps
 from desktop.utils.jobs import FileJob
 from desktop.utils.system import CpuSampler, information, memory
 from desktop.widgets.dialog import Dialog
@@ -29,7 +30,8 @@ LINUX_COMPACT = [
     '|__ ___ |  | |_| / \\',
 ]
 APPS = [('Files', 'files'), ('Text editor', 'editor'), ('Terminal', 'shell'),
-        ('System information', 'system'), ('Help / About', 'help'), ('Power / Logout', 'power')]
+        ('System information', 'system'), ('Processes', 'processes'), ('Network', 'network'),
+        ('Help / About', 'help'), ('Power / Logout', 'power')]
 
 
 def clean(text):
@@ -68,6 +70,7 @@ class Desktop:
         self.editor_top = self.editor_left = 0
         self.editor_query = ''
         self.editor_return = 'home'
+        self.system_apps = SystemApps(self)
 
     def display(self, text):
         text = clean(text)
@@ -82,7 +85,7 @@ class Desktop:
         height, width = self.screen.getmaxyx()
         if 0 <= y < height and 0 <= x < width - 1:
             # Clip by terminal cells so wide Unicode text cannot cross borders.
-            available = width - x - (3 if 3 <= y < height - 3 and x >= 2 else 1)
+            available = width - x - (3 if 3 <= y < height - 3 and 2 <= x < width - 2 else 1)
             clipped = []
             for character in self.display(text):
                 cells = cell_width(character)
@@ -109,6 +112,7 @@ class Desktop:
         self.text(h - 3, 0, corners[2] + horizontal * max(0, w - 3) + corners[3])
 
     def tick(self):
+        self.system_apps.tick()
         now = time.monotonic()
         if now - self.last_tick >= 1:
             self.cpu_value = self.cpu.sample()
@@ -139,7 +143,7 @@ class Desktop:
             self.text(y, 3, f'{index + 1:>{gutter - 1}} ', curses.A_DIM)
             self.text(y, x, editor.lines[index][self.editor_left:].expandtabs(4))
         self.text(h - 5, 3, f'Ln {editor.row + 1}, Col {editor.column + 1} | '
-                  + ('Modified' if editor.dirty else 'Saved') + ' | UTF-8')
+                  + ('Modified' if editor.dirty else 'Saved') + ' | Ctrl+Z Undo | Ctrl+Y Redo')
         self.text(h - 4, 3, 'Ctrl+S Save | Ctrl+O Open | Ctrl+N New | Ctrl+F Find')
         return (4 + editor.row - self.editor_top,
                 x + self.width(line[self.editor_left:editor.column].expandtabs(4)))
@@ -170,7 +174,9 @@ class Desktop:
             self.text(1, 1, time.strftime('%H:%M:%S'))
         title = {'home': 'Desktop', 'menu': 'Application launcher', 'files': str(self.browser.path),
                  'system': 'System information', 'preview': 'File preview', 'help': 'Help / About',
-                 'power': 'Power / Logout', 'editor': 'Text editor'}.get(self.page, self.page)
+                 'power': 'Power / Logout', 'editor': 'Text editor',
+                 'processes': 'Processes', 'process_details': 'Process inspection',
+                 'network': 'Network', 'network_details': 'Network details'}.get(self.page, self.page)
         if self.page == 'editor' and self.editor:
             title = f'Text editor: {self.editor.path or "Untitled"}' + (' *' if self.editor.dirty else '')
         self.frame(title)
@@ -219,11 +225,13 @@ class Desktop:
             self.text(h - 4, 3, 'E Edit | N Rename | / Search | H Hidden | Backspace Up')
         elif self.page == 'editor' and self.editor:
             cursor = self.render_editor(h, w)
+        elif self.page in ('processes', 'network'):
+            self.system_apps.render(self.page, h, w)
         else:
-            lines = information() if self.page == 'system' else self.lines
+            lines = self.view_lines()
             for y, line in enumerate(lines[self.offset:self.offset + h - 8], 4):
                 self.text(y, 3, line)
-        self.text(h - 2, 1, self.message)
+        self.text(h - 2, 1, self.system_apps.detail_warning(self.page) or self.message)
         footer = ('F5 Next match | F6 Save as | Esc/Ctrl+Q Close | F1 Menu | F2 Files'
                   if self.page == 'editor' else
                   'F1 Menu | F2 Files | F3 Shell | F4 System | F9 Editor | F10 Power')
@@ -304,11 +312,13 @@ class Desktop:
                 self.page, self.message = 'editor', ''
             return
         self.page, self.choice, self.offset, self.message = page, 0, 0, ''
+        self.system_apps.opened(page)
         if page == 'files':
             self.browser.refresh()
         elif page == 'help':
             self.lines = ['ASCII Linux 0.1 — Debian-based console desktop.',
                           'F1 Menu, F2 Files, F3 Bash, F4 System, F9 Editor, F10 Power.',
+                          'F11 Processes, F12 Network (also available in F1 Menu).',
                           'Files: Enter previews; E edits; Backspace goes to parent.',
                           'H toggles hidden files; R refreshes; / filters filenames.',
                           'F5 Copy, F6 Move, F7 Mkdir, F8 Delete, N Rename.',
@@ -316,9 +326,13 @@ class Desktop:
                           'Directories and symlinks are supported; deletion asks first.',
                           'Editor: Ctrl+S Save, Ctrl+O Open, Ctrl+N New, Ctrl+F Find.',
                           'Editor: arrows, Home/End, Page Up/Down, Tab, Backspace/Delete.',
+                          'Ctrl+Z Undo, Ctrl+Y Redo; history is bounded.',
                           'F5 finds next match; F6 saves as; Esc/Ctrl+Q closes.',
                           'Switching applications preserves the editor buffer.',
                           'Leaving/replacing an unsaved document asks before discarding.',
+                          'Processes: / search, S sort, Enter inspect, K confirmed SIGTERM.',
+                          'Network: arrows select, Enter addresses/routes/DNS, R refresh.',
+                          'Network configuration and Wi-Fi connection are future work.',
                           'Prompts: Ctrl+U clears input; Esc cancels.',
                           'Other Linux TTYs remain available for recovery.',
                           'Installer and advanced applications are future milestones.']
@@ -341,6 +355,10 @@ class Desktop:
         editor = self.editor
         if key in ('\x1b', '\x11'):
             self.close_editor()
+        elif key == '\x1a':
+            self.message = 'Undone' if editor.undo() else 'Nothing to undo'
+        elif key == '\x19':
+            self.message = 'Redone' if editor.redo() else 'Nothing to redo'
         elif key == '\x13':
             self.save_editor()
         elif key == curses.KEY_F6:
@@ -450,6 +468,10 @@ class Desktop:
             self.open_page('editor')
         elif key == curses.KEY_F10:
             self.open_page('power')
+        elif key == curses.KEY_F11:
+            self.open_page('processes')
+        elif key == curses.KEY_F12:
+            self.open_page('network')
         elif self.page == 'editor':
             self.handle_editor(key)
         elif key == '\x11':
@@ -457,7 +479,9 @@ class Desktop:
             if self.confirm(question):
                 self.running = False
         elif key == '\x1b':
-            self.open_page('files' if self.page == 'preview' else 'home')
+            parent = {'preview': 'files', 'process_details': 'processes',
+                      'network_details': 'network'}
+            self.open_page(parent.get(self.page, 'home'))
         elif self.page in ('menu', 'power'):
             count = len(APPS) if self.page == 'menu' else 4
             if key in (curses.KEY_UP, curses.KEY_DOWN, '\t'):
@@ -481,8 +505,32 @@ class Desktop:
                             self.external(['sudo', '/usr/bin/systemctl', action])
         elif self.page == 'files':
             self.handle_files(key)
-        elif key in (curses.KEY_UP, curses.KEY_DOWN, curses.KEY_PPAGE, curses.KEY_NPAGE):
-            count = len(information()) if self.page == 'system' else len(self.lines)
+        elif self.page in ('processes', 'process_details', 'network', 'network_details'):
+            self.system_apps.handle(self.page, key)
+        else:
+            self.scroll_lines(key)
+
+    def view_lines(self):
+        if self.page == 'system':
+            return information()
+        if self.page not in ('process_details', 'network_details'):
+            return self.lines
+        # Preserve every address/argument; narrow terminals can scroll wrapped lines.
+        width = max(1, self.screen.getmaxyx()[1] - 6)
+        wrapped = []
+        for line in self.lines:
+            current = ''
+            for character in clean(line):
+                if current and self.width(current + character) > width:
+                    wrapped.append(current)
+                    current = ''
+                current += character
+            wrapped.append(current)
+        return wrapped
+
+    def scroll_lines(self, key):
+        if key in (curses.KEY_UP, curses.KEY_DOWN, curses.KEY_PPAGE, curses.KEY_NPAGE):
+            count = len(self.view_lines())
             delta = -1 if key in (curses.KEY_UP, curses.KEY_PPAGE) else 1
             if key in (curses.KEY_PPAGE, curses.KEY_NPAGE):
                 delta *= max(1, self.screen.getmaxyx()[0] - 8)
