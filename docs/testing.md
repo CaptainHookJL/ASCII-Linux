@@ -7,9 +7,10 @@ is missing:
 
 ```sh
 python3 -m desktop.main --check
+python3 -m desktop.browser --check
 python3 -m unittest discover -s tests -v
 bash -n build/*.sh
-sh -n system/ascii-session system/ascii-console system/ascii-xsession \
+sh -n system/ascii-session system/ascii-console system/ascii-xsession system/ascii-browser \
   system/profile/ascii-session.sh
 ```
 
@@ -28,7 +29,7 @@ Editor history tests cover saved baselines, cursor/content restoration and memor
 Check the Apps section in both a 60-column terminal and one at least 86 columns
 wide: the desktop should show an Apps strip or panel, respectively, and selection
 should remain visible after resizing. A fresh catalog should show an empty Apps
-list, while Files, Text editor, Terminal, System information, Processes and
+list, while Files, Text editor, Web browser, Terminal, System information, Processes and
 Network remain available through F1 and their function keys. Open full Apps with
 A from the desktop and F1 menu, and through the Apps menu entry. Press N and
 register a harmless command with a name, optional description and terminal mode;
@@ -78,6 +79,31 @@ records created before modes were added must retain terminal behavior. In a
 console session without a display, graphical launching must show an error and
 keep the desktop usable. No panel or graphical root menu should appear.
 
+For the ASCII browser, use W from the desktop or F1, and also test the standalone
+`python3 -m desktop.browser http://127.0.0.1:PORT/` command against a disposable
+local HTTP server. Use HTML containing headings, lists, relative links, entities,
+Unicode text, scripts and styles; visible controls and pages must remain ASCII,
+scripts/styles must not render or execute, and links must resolve correctly.
+Navigate with Tab/Enter, scroll and resize, then verify Backspace, forward (`]`),
+reload (`R`) and find (`/`, `N`). Follow a redirect and confirm subsequent relative
+links use its final URL. Plain text must display; HTTP failures, binary content
+and a response over 2 MiB must report errors while retaining the current page.
+Use a delayed local response to check that the desktop still accepts input, X
+cancels, leaving the browser returns promptly, and a late result cannot replace
+a newer page. Keep an unsaved editor buffer across browser navigation.
+
+With a temporary HOME/XDG data directory, bookmark a loaded page with B, use M
+to open it, restart and check persistence without affecting real user bookmarks.
+In bookmarks, cancel D removal, then confirm; R reloads data and M returns to
+the page. Repeated bookmarking should keep the original entry without duplicates.
+Test malformed or externally changed bookmark data without crashing the desktop
+or overwriting it. Confirm a fresh user Apps catalog remains empty after opening
+the built-in browser. In an installed image, register `ascii-browser` through N
+with terminal mode and test its standalone return to the desktop. HTTPS checks
+must use trusted certificates; do not disable verification to make a test pass.
+The automated browser workflows use localhost fixtures, so they do not establish
+that every external site is accessible or that JavaScript-dependent sites work.
+
 For a separate manual Brave check in that graphical session,
 follow [Brave's official Linux installation page](https://brave.com/linux/).
 Install `curl` first with `sudo apt install curl` if missing. In I, use name
@@ -98,6 +124,8 @@ Check the initially empty Apps list, registration, navigation and launching from
 the desktop and full Apps page. Saved launchers should survive a desktop restart;
 the live image has no persistent storage by default and does not promise to
 retain them after a reboot.
+Open the browser with W and navigate to an HTTP/HTTPS text page if networking is
+available; test the installed `ascii-browser` command and saved bookmark flow.
 Test F9 and E from Files: edit and save Welcome.txt, create a new document,
 search, switch applications and return, and cancel an unsaved close. Test copy,
 rename, move, mkdir and confirmed deletion on disposable files in the live user's

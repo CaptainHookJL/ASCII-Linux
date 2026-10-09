@@ -8,8 +8,9 @@ graphical desktop menu.
 Debian supplies the kernel, systemd, apt, networking, and device support.
 ASCII Linux supplies the ASCII desktop, session startup, branding, and image
 build configuration. This repository implements the live-system prototype and its next desktop
-milestones: file operations, a built-in text editor, process management and network
-information, from the ASCII Linux Distribution Specification.
+milestones: file operations, a built-in text editor and ASCII web browser,
+process management and network information, from the ASCII Linux Distribution
+Specification.
 
 ## Run the desktop now
 
@@ -27,7 +28,8 @@ and use only a local HTTP server; on Debian/Ubuntu, run `sudo apt install curl`
 if it is missing. Use a terminal of at least 60 columns by 16 rows.
 F1 opens the launcher, F2 opens Files, F3 launches Bash, F4 opens system information,
 F9 opens or resumes the text editor, F10 opens the power menu, F11 opens Processes,
-and F12 opens Network. These built-in tools remain available through F1. Press `A`
+and F12 opens Network. These built-in tools remain available through F1. Press `W`
+on the desktop or in F1 to open the ASCII web browser. Press `A`
 on the desktop or in the F1 menu to open your Apps section. Arrows
 navigate and Enter selects. Esc goes back; Ctrl+Q closes the editor or asks to
 leave the desktop. Type `exit` in Bash to return to the desktop.
@@ -60,8 +62,8 @@ not provide that display.
 ## Apps
 
 Apps is your list of saved launchers and starts empty. Files, Text editor,
-Terminal, System information, Processes and Network stay in F1 and on their
-existing function keys. The desktop shows an Apps panel at 86 columns or wider,
+Web browser, Terminal, System information, Processes and Network stay in F1 and
+on their existing function keys or shortcuts. The desktop shows an Apps panel at 86 columns or wider,
 or a compact Apps strip in narrower terminals. Use arrows or Tab to select a
 saved app and Enter to launch it. `A` opens the full Apps page from the desktop
 or F1 menu; Esc returns to the desktop.
@@ -130,6 +132,68 @@ a JSON list of records with `id`, `name`, `command` (a list of argument strings)
 `terminal`). Prefer the Apps UI to editing this file. The live ISO has no
 persistent storage by default, so saved launchers there last only for that live
 session unless persistence is configured separately.
+
+## ASCII web browser
+
+The built-in browser renders web pages as text inside the ASCII desktop. Open it
+with `W` from the desktop or F1. It also runs by itself from the repository:
+
+```sh
+python3 -m desktop.browser
+python3 -m desktop.browser https://example.com
+python3 -m desktop.browser --check  # noninteractive import and URL checks
+```
+
+On the live image, `ascii-browser https://example.com` is the equivalent command.
+To put it in your user Apps list, press `N` and register name `ASCII Browser`,
+launch command `ascii-browser`, and terminal mode `t`. The browser's built-in
+entry does not create a saved user launcher.
+
+For your downloaded checkout, use this launch command in Apps with mode `t`:
+
+```sh
+bash /home/jacob/Downloads/ASCII-Linux-main/system/ascii-browser
+```
+
+The wrapper finds the project even though Apps runs commands from your home
+directory. Adjust the absolute path if you extracted the source elsewhere.
+
+| In Web browser | Action |
+| --- | --- |
+| G | Enter an HTTP or HTTPS address |
+| Tab / Shift+Tab / Enter | Select next link / previous link / follow link |
+| Up/Down, Page Up/Down, Home/End | Scroll the text page |
+| Backspace / `]` | Back / forward through loaded pages |
+| R / X | Reload / cancel loading |
+| `/` / N | Find text / next match |
+| B / M | Bookmark current page / open bookmarks |
+| Esc | Return to the desktop; close a standalone browser |
+
+In bookmarks, arrows select and Enter opens a page; `D` confirms removal, `R`
+reloads saved bookmarks, and `M` returns to the current page.
+
+Page loads run in a background worker so you can scroll, cancel, or leave the
+browser during a slow request. Back and forward use cached pages without a new
+request; history retains at most 100 pages within an 8 MiB budget.
+HTML headings, paragraphs, lists and links become readable text, and relative
+links resolve against the loaded page's address. The browser accepts HTML and
+plain text over HTTP/HTTPS, follows redirects, verifies HTTPS certificates, and
+limits each response body to 2 MiB. Unsupported content and failed requests show
+an error while retaining the current page. Session cookies stay in memory.
+It requires only Python's standard
+library and the system CA certificates already included in the image.
+
+This first version does not run JavaScript, render CSS or fetch images, submit forms,
+or provide file downloads. Sites that require those features may be incomplete;
+launch a graphical browser such as Brave from Apps when needed. Displayed controls
+and page text use ASCII; image alt text appears as a placeholder. Link targets
+remain valid when their visible labels need ASCII replacement. Bookmarks save in
+`${XDG_DATA_HOME:-~/.local/share}/ascii-linux/browser-bookmarks.json`;
+a relative `XDG_DATA_HOME` uses the default under `~/.local/share`. Up to 256
+bookmarks are supported; bookmarking an existing URL keeps its current entry.
+If another program changes the bookmark file, use `R` in bookmarks before changing it again.
+As with user launchers, live-session bookmarks are temporary unless storage
+persistence is configured separately.
 
 ## Files and Text editor
 
@@ -225,7 +289,7 @@ sudo apt-get install --no-install-recommends live-build debootstrap \
   squashfs-tools xorriso isolinux syslinux-common grub-pc-bin \
   grub-efi-amd64-bin mtools dosfstools qemu-system-x86 qemu-system-gui ovmf
 # Needed if you extracted GitHub's ZIP rather than cloning:
-chmod +x build/*.sh system/ascii-session system/ascii-console \
+chmod +x build/*.sh system/ascii-session system/ascii-console system/ascii-browser \
   system/ascii-xsession live-build/config/hooks/live/*.chroot
 sudo ./build/build-iso.sh
 ```

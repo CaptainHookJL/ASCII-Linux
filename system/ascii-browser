@@ -1,0 +1,10 @@
+#!/bin/sh
+# Run the built-in text browser from an installed system or source checkout.
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
+if [ -d "$SCRIPT_DIR/../desktop" ]; then
+    cd "$SCRIPT_DIR/.." || exit 1
+else
+    cd /usr/lib/ascii-linux || exit 1
+fi
+export PYTHONDONTWRITEBYTECODE=1
+exec python3 -m desktop.browser "$@"

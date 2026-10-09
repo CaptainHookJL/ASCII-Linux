@@ -50,6 +50,36 @@ than clearing when history is exhausted. It contains no curses calls.
 inspects process metadata, and sends confirmed-by-UI SIGTERM through pidfds.
 `desktop/apps/network_manager.py` reads interface/address/route/resolver/traffic
 information through sysfs, procfs and bounded read-only iproute2 requests.
+`desktop/apps/web_browser.py` implements the text browser without a third-party
+rendering engine. Python's `urllib` fetches HTTP/HTTPS pages with normal TLS
+certificate verification, bounded responses and content-type checks.
+`html.parser.HTMLParser` turns HTML into text and numbered links, resolving
+relative targets against the final response address. Scripts and styles are
+omitted, images use alt-text placeholders without fetching, and forms cannot be
+edited or submitted. Plain-text responses also display. A page has at most 2,048
+numbered links. Cookies last only for the in-memory browser session.
+The browser model caches at most 100 back/forward pages within an 8 MiB budget,
+retaining the current page, and page loading runs off
+the curses thread. Cancelled or superseded requests cannot replace the active
+page. `desktop/apps/browser_data.py` stores up to 256 bookmarks as JSON name/URL
+records under the user's absolute XDG data directory in
+`ascii-linux/browser-bookmarks.json`, otherwise `~/.local/share`. An empty store
+does not create a file. Writes are atomic, detect external edits, and refuse
+unsafe or malformed files. Adding the same URL keeps its existing bookmark.
+`desktop/core/web_browser_view.py` renders wrapped ASCII page text, selectable
+links, case-insensitive find results and saved bookmarks. It owns scrolling,
+link selection, address prompts, bookmark creation/removal and navigation keys;
+the worker never accesses curses. Bookmark R reloads externally changed data.
+`desktop/browser.py` is the standalone `python3 -m desktop.browser [URL]` entry
+point. The desktop's W/F1 route uses the same browser interface; it does not add
+an entry to the saved user Apps catalog. `system/ascii-browser` runs the standalone
+browser from the checkout or installed `/usr/lib/ascii-linux` source tree and is
+staged as `/usr/local/bin/ascii-browser` in the live image.
+`tests/test_web_browser.py`, `tests/test_browser_data.py` and
+`tests/test_browser_view.py` cover fetching/rendering/navigation, bookmark
+integrity and browser controls. `tests/test_browser_workflows.py` runs actual
+desktop, standalone and Apps-launched browser flows in pseudo-terminals against
+a disposable local HTTP server.
 `desktop/core/system_views.py` renders these apps and handles their keyboard actions.
 `desktop/widgets/table.py` keeps selections stable over immutable snapshots,
 filters and sorts. `desktop/utils/polling.py` samples on a worker thread and applies

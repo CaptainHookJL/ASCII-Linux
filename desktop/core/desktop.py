@@ -13,6 +13,7 @@ from desktop.apps.catalog import validate_install_command
 from desktop.apps.launcher import GraphicalLauncher, graphical_session_available
 from desktop.apps.text_editor import TextEditor
 from desktop.core.system_views import SystemApps
+from desktop.core.web_browser_view import WebBrowserView
 from desktop.utils.jobs import FileJob
 from desktop.utils.system import CpuSampler, information, memory
 from desktop.widgets.dialog import Dialog
@@ -35,7 +36,7 @@ LINUX_COMPACT = [
 ]
 APPS = [('Files', 'files'), ('Text editor', 'editor'), ('Terminal', 'shell'),
         ('System information', 'system'), ('Processes', 'processes'), ('Network', 'network'),
-        ('Apps', 'apps'), ('Help / About', 'help'), ('Power / Logout', 'power')]
+        ('Apps', 'apps'), ('Web browser', 'web'), ('Help / About', 'help'), ('Power / Logout', 'power')]
 
 
 def clean(text):
@@ -55,9 +56,10 @@ def input_path(name):
 
 
 class Desktop:
-    def __init__(self, screen, ascii_only=True):
+    def __init__(self, screen, ascii_only=True, browser_only=False):
         self.screen = screen
         self.ascii_only = ascii_only
+        self.browser_only = browser_only
         self.page = 'home'
         self.choice = 0
         self.browser = FileManager()
@@ -77,10 +79,11 @@ class Desktop:
         self.system_apps = SystemApps(self)
         self.apps = AppsSection()
         self.graphical_launcher = GraphicalLauncher()
+        self.web_browser_view = WebBrowserView(self)
 
     def display(self, text):
         text = clean(text)
-        if self.ascii_only:
+        if self.ascii_only or getattr(self, 'page', None) == 'web':
             text = text.encode('ascii', errors='replace').decode('ascii')
         return text
 
@@ -106,7 +109,7 @@ class Desktop:
 
     def frame(self, title):
         h, w = self.screen.getmaxyx()
-        if self.ascii_only:
+        if self.ascii_only or self.page == 'web':
             horizontal, vertical, corners = '-', '|', '++++'
         else:
             horizontal, vertical, corners = '─', '│', '┌┐└┘'
@@ -119,6 +122,7 @@ class Desktop:
 
     def tick(self):
         self.system_apps.tick()
+        self.web_browser_view.tick()
         for app, status in self.graphical_launcher.poll():
             if status:
                 self.message = f'{app.name} exited with status {status}'
@@ -163,7 +167,8 @@ class Desktop:
         cursor = None
         if h < 16 or w < 60:
             self.text(0, 0, 'Resize to at least 60 columns x 16 rows.')
-            self.text(1, 0, 'Esc/Ctrl+Q closes editor or confirms desktop exit.')
+            self.text(1, 0, 'Esc/Ctrl+Q exits browser.' if self.browser_only else
+                      'Esc/Ctrl+Q closes editor or confirms desktop exit.')
             if self.dialog:
                 self.dialog.render(self.text, h, w, self.width)
                 cursor = self.dialog.cursor_position
@@ -175,7 +180,8 @@ class Desktop:
                 pass
             self.screen.refresh()
             return
-        self.text(0, 1, f'ASCII Linux | {getpass.getuser()}@{socket.gethostname()}', curses.A_BOLD)
+        brand = 'ASCII Browser' if self.browser_only else 'ASCII Linux'
+        self.text(0, 1, f'{brand} | {getpass.getuser()}@{socket.gethostname()}', curses.A_BOLD)
         try:
             total, used = memory()
             self.text(1, 1, f'CPU {self.cpu_value:4.0f}% | RAM {used / total:4.0%} | {time.strftime("%H:%M:%S")}')
@@ -186,6 +192,7 @@ class Desktop:
                  'power': 'Power / Logout', 'editor': 'Text editor',
                  'processes': 'Processes', 'process_details': 'Process inspection',
                  'network': 'Network', 'network_details': 'Network details',
+                 'web': 'ASCII Web Browser',
                  'install_review': 'Review app install'}.get(self.page, self.page)
         if self.page == 'editor' and self.editor:
             title = f'Text editor: {self.editor.path or "Untitled"}' + (' *' if self.editor.dirty else '')
@@ -217,10 +224,15 @@ class Desktop:
                 self.apps.render_compact(self, w)
         elif self.page == 'apps':
             self.apps.render(self, h, w)
+        elif self.page == 'web':
+            self.web_browser_view.render(h, w)
         elif self.page in ('menu', 'power'):
             items = [name for name, _ in APPS] if self.page == 'menu' else ['Cancel', 'Logout', 'Reboot', 'Shutdown']
-            for i, item in enumerate(items):
-                self.text(4 + i, 3, ('> ' if i == self.choice else '  ') + item,
+            count = max(1, h - 7)
+            start = max(0, self.choice - count + 1)
+            for row, item in enumerate(items[start:start + count], 4):
+                i = start + row - 4
+                self.text(row, 3, ('> ' if i == self.choice else '  ') + item,
                           curses.A_REVERSE if i == self.choice else 0)
         elif self.page == 'files':
             count = max(1, h - 11)
@@ -253,9 +265,11 @@ class Desktop:
                 self.text(y, 3, line)
         app_error = self.apps.error if self.page in ('apps', 'home') else ''
         self.text(h - 2, 1, self.system_apps.detail_warning(self.page) or app_error or self.message)
-        footer = ('F5 Next match | F6 Save as | Esc/Ctrl+Q Close | F1 Menu | F2 Files'
+        footer = (self.web_browser_view.footer()
+                  if self.page == 'web' else
+                  'F5 Next match | F6 Save as | Esc/Ctrl+Q Close | F1 Menu | F2 Files'
                   if self.page == 'editor' else
-                  'A Apps | F1 Menu | F2 Files | F3 Shell | F4 System | F9 Editor'
+                  'A Apps | W Web | F1 Menu | F2 Files | F3 Shell | F9 Editor'
                   if self.page == 'home' else
                   'Arrows/Tab Select | Enter Open | Esc Desktop'
                   if self.page == 'apps' else
@@ -328,7 +342,7 @@ class Desktop:
         if self.unsaved() and not self.confirm('Discard unsaved changes and open another document?'):
             return
         if self.page != 'editor':
-            self.editor_return = self.page if self.page in ('files', 'home', 'menu', 'apps') else 'home'
+            self.editor_return = self.page if self.page in ('files', 'home', 'menu', 'apps', 'web') else 'home'
         self.editor = replacement
         self.editor_top = self.editor_left = 0
         self.editor_query = ''
@@ -347,6 +361,8 @@ class Desktop:
             self.apps.set_query('')
         if page == 'files':
             self.browser.refresh()
+        elif page == 'web':
+            self.web_browser_view.opened()
         elif page == 'help':
             self.lines = ['ASCII Linux 0.1 - ASCII desktop with graphical apps.',
                           'F1 Menu, F2 Files, F3 Bash, F4 System, F9 Editor, F10 Power.',
@@ -359,6 +375,11 @@ class Desktop:
                           'Apps: M changes terminal/graphical launch mode.',
                           'Graphical apps open separate windows; Alt+Tab switches.',
                           'Dedicated X11 session: Super+D returns to the ASCII desktop.',
+                          'W from Desktop/F1 Menu opens the ASCII Web Browser.',
+                          'Browser: G URL, Tab links, Enter follow, arrows scroll.',
+                          'Backspace Back, ] Forward, R Reload, X Cancel loading.',
+                          '/ Find text, N Next match, B Bookmark, M Bookmarks.',
+                          'Browser reads HTML/text; JavaScript, CSS and forms are not supported.',
                           'Files: Enter previews; E edits; Backspace goes to parent.',
                           'H toggles hidden files; R refreshes; / filters filenames.',
                           'F5 Copy, F6 Move, F7 Mkdir, F8 Delete, N Rename.',
@@ -623,6 +644,12 @@ class Desktop:
             self.message = 'Apps reloaded'
 
     def handle(self, key):
+        if self.browser_only:
+            if key in ('\x1b', '\x11'):
+                self.running = False
+            else:
+                self.web_browser_view.handle(key)
+            return
         if self.job:
             self.message = 'Operation in progress; please wait.'
             return
@@ -646,6 +673,8 @@ class Desktop:
             self.handle_editor(key)
         elif self.page in ('home', 'menu') and key in ('a', 'A'):
             self.open_page('apps')
+        elif self.page in ('home', 'menu') and key in ('w', 'W'):
+            self.open_page('web')
         elif key == '\x11':
             question = 'Leave ASCII desktop and discard unsaved changes?' if self.unsaved() else 'Leave ASCII desktop?'
             if self.confirm(question):
@@ -677,6 +706,8 @@ class Desktop:
                             self.external(['sudo', '/usr/bin/systemctl', action])
         elif self.page in ('apps', 'home'):
             self.handle_apps(key)
+        elif self.page == 'web':
+            self.web_browser_view.handle(key)
         elif self.page == 'files':
             self.handle_files(key)
         elif self.page in ('processes', 'process_details', 'network', 'network_details'):
@@ -716,14 +747,17 @@ class Desktop:
         curses.set_escdelay(25)
         self.screen.keypad(True)
         self.screen.timeout(200)
-        while self.running:
-            try:
-                self.tick()
-                self.render()
+        try:
+            while self.running:
                 try:
-                    key = self.screen.get_wch()
-                except curses.error:
-                    continue
-                self.handle(key)
-            except (OSError, ValueError) as error:
-                self.message = str(error)
+                    self.tick()
+                    self.render()
+                    try:
+                        key = self.screen.get_wch()
+                    except curses.error:
+                        continue
+                    self.handle(key)
+                except (OSError, ValueError) as error:
+                    self.message = str(error)
+        finally:
+            self.web_browser_view.close()
