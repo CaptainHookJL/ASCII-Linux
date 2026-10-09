@@ -3,7 +3,52 @@
 Source checks ran in a Debian 13 amd64 cloud container. They establish desktop
 and browser behavior, not a bootable ISO release.
 
-## ASCII browser update
+## ASCII layout prototype
+
+- All **263 unittest tests passed**, with no skips: the prior 227-test baseline
+  plus 19 layout-renderer tests, 11 document-model tests, three real-terminal
+  layout workflows and three browser-view tests.
+- Model and renderer checks cover semantic regions, embedded/inline CSS hints,
+  hidden content, weighted grid/flex columns, narrow reflow, cards, table cells
+  and spans, preformatted content, malformed/deep structure, resource limits
+  and lossless flowing-text fallback. Link numbering and history-size accounting
+  retain the existing bounds.
+  Cumulative output checks stop rendering sibling boxes before excessive
+  padded content can accumulate, including wide and narrow grid layouts.
+- Real curses workflows draw wide columns and aligned tables, toggle L without
+  refetching, follow selected links, reflow search results at 60 columns and
+  preserve an unsaved editor draft across desktop tools. View tests preserve
+  the selected search occurrence across layout/text mode changes and report a
+  text fallback when a layout is too complex. A tiny-terminal regression loads
+  HTML and plain text at 5 columns by 7 rows, bounds reflow to the minimum usable
+  width, then restores normal display at 60 columns by 16 rows. These checks use
+  disposable local HTTP fixtures and temporary homes.
+- Desktop/browser `--check`, shell syntax checks and `git diff --check` passed.
+
+The browser now defaults to an approximate ASCII layout for HTML pages, with L
+switching to flowing text from the same cached page. Semantic HTML regions,
+basic embedded/inline grid/flex hints, bordered cards and aligned tables shape
+the output. Most CSS and all external stylesheets remain unsupported.
+
+The included [browser-layout-demo.html](browser-layout-demo.html) parsed with
+seven valid numbered links and an immutable layout tree. Its text was ASCII,
+and retained page data counted toward the existing history budget. Rendering
+at widths of 100 and 54 cells produced 51 and 75 ASCII-only rows, respectively,
+within the requested widths. The wider output put aside/main regions and the
+two cards side by side; the narrower output stacked them. Both preserved
+headings, card content, table cells and the footer. This establishes the
+included fixture's approximate layout; it does
+not establish fidelity to arbitrary sites or a full CSS rendering engine.
+
+A real HTTPS fetch of `https://pypi.org/help/` succeeded with normal certificate
+verification. It retained layout structure, 251 links and 276,730 bytes charged
+to page history. Layout rendering produced 1,020 rows at 100 cells and 1,454
+rows at 54 cells, with ASCII-only output bounded to those widths. This verifies
+one external page alongside the local fixture; it does not establish every
+site's accessibility or layout fidelity. Layout search works within rendered
+rows; phrases split across rows can be searched using the flowing text view.
+
+## Previously verified ASCII browser baseline
 
 - All **227 unittest tests passed**, with no skips: the 178-test desktop/session
   baseline plus 16 browser backend tests, 17 bookmark-store tests, 11 browser-view
@@ -38,9 +83,11 @@ and browser behavior, not a bootable ISO release.
 - Desktop and browser module checks, the source wrapper's `--check`, all build
   and session shell syntax checks, and `git diff --check` passed.
 
-The browser does not execute JavaScript, render CSS, fetch images, submit forms
-or download files. Image alt text uses placeholders. Those capabilities, and
-JavaScript-dependent sites, require a graphical browser or future browser work.
+The current browser approximates HTML layout using semantic structure and a
+small subset of embedded/inline CSS hints. It does not fetch external
+stylesheets, execute JavaScript, fetch images, submit forms or download files.
+Image alt text uses placeholders. Full CSS rendering and JavaScript-dependent
+sites require a graphical browser or future browser work.
 
 ## Previously verified desktop and native windows
 

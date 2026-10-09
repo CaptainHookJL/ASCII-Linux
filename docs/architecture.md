@@ -50,14 +50,29 @@ than clearing when history is exhausted. It contains no curses calls.
 inspects process metadata, and sends confirmed-by-UI SIGTERM through pidfds.
 `desktop/apps/network_manager.py` reads interface/address/route/resolver/traffic
 information through sysfs, procfs and bounded read-only iproute2 requests.
-`desktop/apps/web_browser.py` implements the text browser without a third-party
+`desktop/apps/web_browser.py` implements the ASCII browser without a third-party
 rendering engine. Python's `urllib` fetches HTTP/HTTPS pages with normal TLS
 certificate verification, bounded responses and content-type checks.
 `html.parser.HTMLParser` turns HTML into text and numbered links, resolving
-relative targets against the final response address. Scripts and styles are
-omitted, images use alt-text placeholders without fetching, and forms cannot be
+relative targets against the final response address. Script/style source is
+omitted from page text, images use alt-text placeholders without fetching, and forms cannot be
 edited or submitted. Plain-text responses also display. A page has at most 2,048
 numbered links. Cookies last only for the in-memory browser session.
+`desktop/apps/web_layout.py` also parses HTML into an immutable, bounded
+`LayoutNode` tree stored with the page's ordinary text lines. It retains semantic
+regions and restricted layout hints from inline styles and flat embedded CSS
+rules. Simple tag, class and ID selectors and their compounds are supported;
+combinators, at-rules, media queries and external stylesheets are ignored.
+The tree is limited to 4,096 nodes, 64 levels and 2 MiB of text; exceeding those
+limits falls back to ordinary text. Embedded CSS is capped at 64 KiB and 256
+rules. Retained layout data contributes to the page's history-size accounting.
+`desktop/utils/ascii_layout.py` converts that tree into terminal-width ASCII
+lines: bordered header/nav/main/aside/article/footer regions, responsive
+columns/cards using basic grid/flex hints, and aligned tables. Narrow widths
+stack columns. Unsupported complex layout degrades to flowing text. This is
+an approximation, without pixel geometry, font metrics or a graphical engine.
+No images, stylesheet URLs, fonts or other page assets are downloaded, and CSS
+source is never executed.
 The browser model caches at most 100 back/forward pages within an 8 MiB budget,
 retaining the current page, and page loading runs off
 the curses thread. Cancelled or superseded requests cannot replace the active
@@ -66,10 +81,13 @@ records under the user's absolute XDG data directory in
 `ascii-linux/browser-bookmarks.json`, otherwise `~/.local/share`. An empty store
 does not create a file. Writes are atomic, detect external edits, and refuse
 unsafe or malformed files. Adding the same URL keeps its existing bookmark.
-`desktop/core/web_browser_view.py` renders wrapped ASCII page text, selectable
+`desktop/core/web_browser_view.py` renders ASCII layout or wrapped page text, selectable
 links, case-insensitive find results and saved bookmarks. It owns scrolling,
 link selection, address prompts, bookmark creation/removal and navigation keys;
-the worker never accesses curses. Bookmark R reloads externally changed data.
+the worker never accesses curses. Layout is the default for HTML pages; L toggles
+flowing text using the same cached page without a new request. Resizing redraws
+at the new available width, retaining link targets and navigation/search state.
+Plain-text responses continue to use text display. Bookmark R reloads externally changed data.
 `desktop/browser.py` is the standalone `python3 -m desktop.browser [URL]` entry
 point. The desktop's W/F1 route uses the same browser interface; it does not add
 an entry to the saved user Apps catalog. `system/ascii-browser` runs the standalone
@@ -79,7 +97,13 @@ staged as `/usr/local/bin/ascii-browser` in the live image.
 `tests/test_browser_view.py` cover fetching/rendering/navigation, bookmark
 integrity and browser controls. `tests/test_browser_workflows.py` runs actual
 desktop, standalone and Apps-launched browser flows in pseudo-terminals against
-a disposable local HTTP server.
+a disposable local HTTP server. `tests/test_web_layout_document.py`,
+`tests/test_ascii_layout.py` and `tests/test_layout_workflows.py` exercise
+the layout model, renderer, semantic regions, column/table reflow and mode
+switching. Layout search operates on rendered rows; phrases spanning those rows
+can instead be searched in flowing-text mode.
+`docs/browser-layout-demo.html` is a self-contained manual fixture with a header,
+navigation, sidebar, cards, table and footer.
 `desktop/core/system_views.py` renders these apps and handles their keyboard actions.
 `desktop/widgets/table.py` keeps selections stable over immutable snapshots,
 filters and sorts. `desktop/utils/polling.py` samples on a worker thread and applies

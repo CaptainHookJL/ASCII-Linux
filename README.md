@@ -135,8 +135,10 @@ session unless persistence is configured separately.
 
 ## ASCII web browser
 
-The built-in browser renders web pages as text inside the ASCII desktop. Open it
-with `W` from the desktop or F1. It also runs by itself from the repository:
+The built-in browser draws web pages with ASCII characters inside the desktop.
+Its default layout view approximates a site's structure with bordered regions,
+navigation rows, columns, cards and aligned tables. Open it with `W` from the
+desktop or F1. It also runs by itself from the repository:
 
 ```sh
 python3 -m desktop.browser
@@ -162,7 +164,8 @@ directory. Adjust the absolute path if you extracted the source elsewhere.
 | --- | --- |
 | G | Enter an HTTP or HTTPS address |
 | Tab / Shift+Tab / Enter | Select next link / previous link / follow link |
-| Up/Down, Page Up/Down, Home/End | Scroll the text page |
+| Up/Down, Page Up/Down, Home/End | Scroll the page |
+| L | Switch between ASCII layout and plain text without reloading |
 | Backspace / `]` | Back / forward through loaded pages |
 | R / X | Reload / cancel loading |
 | `/` / N | Find text / next match |
@@ -176,15 +179,23 @@ Page loads run in a background worker so you can scroll, cancel, or leave the
 browser during a slow request. Back and forward use cached pages without a new
 request; history retains at most 100 pages within an 8 MiB budget.
 HTML headings, paragraphs, lists and links become readable text, and relative
-links resolve against the loaded page's address. The browser accepts HTML and
+links resolve against the loaded page's address. Layout view uses semantic HTML
+regions and a small subset of embedded/inline CSS grid and flex hints; columns
+stack when the terminal is too narrow. Resizing redraws the cached page at the
+new width. Link selection, search and back/forward navigation work in both views.
+Layout search matches within rendered rows; for a phrase split across rows,
+press `L` to search the flowing text view.
+The browser accepts HTML and
 plain text over HTTP/HTTPS, follows redirects, verifies HTTPS certificates, and
 limits each response body to 2 MiB. Unsupported content and failed requests show
 an error while retaining the current page. Session cookies stay in memory.
 It requires only Python's standard
 library and the system CA certificates already included in the image.
 
-This first version does not run JavaScript, render CSS or fetch images, submit forms,
-or provide file downloads. Sites that require those features may be incomplete;
+This is an approximate layout renderer, not a full web rendering engine. It does
+not fetch external stylesheets, run JavaScript, load images, submit forms or
+provide file downloads. It ignores most CSS, including pixel positioning,
+colors, fonts and animations. Sites that depend on those features may be incomplete;
 launch a graphical browser such as Brave from Apps when needed. Displayed controls
 and page text use ASCII; image alt text appears as a placeholder. Link targets
 remain valid when their visible labels need ASCII replacement. Bookmarks save in
@@ -194,6 +205,23 @@ bookmarks are supported; bookmarking an existing URL keeps its current entry.
 If another program changes the bookmark file, use `R` in bookmarks before changing it again.
 As with user launchers, live-session bookmarks are temporary unless storage
 persistence is configured separately.
+
+To try a page designed to show the layout features, run this from the repository
+root in one terminal:
+
+```sh
+python3 -m http.server 8000 --bind 127.0.0.1 --directory docs
+```
+
+Then run the browser in another terminal:
+
+```sh
+python3 -m desktop.browser http://127.0.0.1:8000/browser-layout-demo.html
+```
+
+Compare the header, navigation, sidebar, cards and table at different terminal
+widths, and press `L` to compare layout with plain text. Stop the local demo server
+with Ctrl+C when finished. The included page has no external assets or scripts.
 
 ## Files and Text editor
 

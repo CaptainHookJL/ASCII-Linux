@@ -7,7 +7,8 @@ import unittest
 from unittest.mock import Mock
 
 from desktop.apps.browser_data import Bookmark, BookmarkStore
-from desktop.apps.web_browser import Link, Page
+from desktop.apps.web_browser import Link, Page, render_html
+from desktop.apps.web_layout import LayoutNode
 from desktop.core.web_browser_view import MAX_FIND_MATCHES, WebBrowserView, wrap_lines
 
 
@@ -35,7 +36,7 @@ class BrowserViewTests(unittest.TestCase):
         browser.reload.assert_not_called()
         output = '\n'.join(call.args[2] for call in desktop.text.call_args_list)
         self.assertIn('G opens a URL', output)
-        self.assertIn('No scripts, styles, media, or forms.', output)
+        self.assertIn('No scripts, external styles, media, or forms.', output)
 
     def test_reopening_and_failed_background_load_preserve_page_scroll_and_link(self):
         page = Page('https://example.com/', 'Initial', tuple('line ' + str(i) for i in range(30)),
@@ -108,6 +109,64 @@ class BrowserViewTests(unittest.TestCase):
         self.assertEqual(len(view.matches), MAX_FIND_MATCHES)
         self.assertTrue(view.matches_truncated)
         self.assertEqual(desktop.message, 'Match 1/4096+')
+
+    def test_layout_toggle_preserves_selected_link_search_and_loaded_page(self):
+        page = render_html('<header>Site</header><nav><a href="/one">One</a>'
+                           '<a href="/two">Two</a></nav><main><p>First needle</p>'
+                           '<p>' + 'padding text ' * 25 + '</p><p>Second needle</p></main>',
+                           'https://example.com/')
+        desktop, browser, view = controller(page, dimensions=(16, 100))
+        view.handle('\t')
+        desktop.prompt.return_value = 'needle'
+        view.handle('/')
+        view.handle('n')
+        self.assertEqual(view.match_index, 1)
+        for mode in (False, True):
+            view.handle('l')
+            self.assertEqual(view.layout_enabled, mode)
+            self.assertEqual(view.query, 'needle')
+            self.assertEqual(view.match_index, 1)
+            self.assertEqual(view.link_selected, 1)
+            view.render(16, 100)
+            highlighted = [call.args[2] for call in desktop.text.call_args_list
+                           if len(call.args) > 3 and call.args[3] == curses.A_REVERSE]
+            self.assertTrue(any('Second needle' in line for line in highlighted))
+            desktop.text.reset_mock()
+        self.assertIs(browser.page, page)
+        browser.navigate.assert_not_called()
+        browser.reload.assert_not_called()
+        view.handle('\r')
+        browser.follow.assert_called_once_with(2)
+
+    def test_oversized_layout_falls_back_to_searchable_text_with_correct_mode(self):
+        root = LayoutNode('#text', text='Unreachable layout')
+        for _ in range(55):
+            root = LayoutNode('section', children=(root,))
+        page = Page('https://example.com/', 'Complex', ('Readable fallback needle',), layout=root)
+        desktop, browser, view = controller(page)
+        self.assertIn('showing text', desktop.message)
+        desktop.prompt.return_value = 'needle'
+        view.handle('/')
+        self.assertEqual(desktop.message, 'Match 1/1')
+        view.render(16, 60)
+        output = [call.args[2] for call in desktop.text.call_args_list]
+        self.assertIn('Readable fallback needle', output)
+        self.assertTrue(any(line.startswith('L Text |') for line in output))
+        self.assertIs(browser.page, page)
+        browser.reload.assert_not_called()
+
+    def test_loading_while_terminal_is_tiny_keeps_reflow_at_usable_width(self):
+        text = 'word ' * 2000
+        for page in (Page('https://example.com/', 'Text', (text,)),
+                     render_html('<main>' + text + '</main>', 'https://example.com/')):
+            with self.subTest(layout=page.layout is not None):
+                desktop, browser, view = controller(page, dimensions=(5, 7))
+                self.assertLess(len(view._body(view._dimensions()[1])), 250)
+                view.handle(curses.KEY_END)
+                desktop.screen.getmaxyx = lambda: (16, 60)
+                view.render(16, 60)
+                self.assertIs(browser.page, page)
+                browser.reload.assert_not_called()
 
     def test_resize_clamps_scroll_without_resetting_page(self):
         desktop, browser, view = controller(Page('https://example.com/', 'List', tuple(map(str, range(30)))))

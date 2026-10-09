@@ -4,6 +4,7 @@ import unicodedata
 
 from desktop.apps.browser_data import BookmarkStore, MAX_NAME_CHARS
 from desktop.apps.web_browser import WebBrowser
+from desktop.utils.ascii_layout import LayoutError, render_layout
 
 MAX_FIND_MATCHES = 4096
 
@@ -55,6 +56,9 @@ class WebBrowserView:
         self._last_error = ''
         self._cached_wrap = None
         self._wrapped = []
+        self.layout_enabled = True
+        self.layout_notice = ''
+        self._search_lines = ()
         self._load_bookmarks()
 
     def _load_bookmarks(self):
@@ -82,7 +86,8 @@ class WebBrowserView:
         self._cached_wrap = None
         self._find_matches()
         if self._page is not None and self.desktop.page == 'web':
-            self.desktop.message = 'Loaded: ' + ascii_text(self._page.title or self._page.url)
+            self.desktop.message = (self.layout_notice or
+                                    'Loaded: ' + ascii_text(self._page.title or self._page.url))
         return True
 
     def tick(self):
@@ -95,21 +100,48 @@ class WebBrowserView:
 
     def _body(self, width):
         page = self.browser.page
-        key = (id(page), width)
+        key = (id(page), width, self.layout_enabled)
         if key != self._cached_wrap:
             lines = page.lines if page is not None else (
                 'ASCII Web',
                 'G opens a URL; example: https://example.com',
-                'Text pages and numbered links; Tab selects a link.',
-                'No scripts, styles, media, or forms.',
+                'L switches ASCII layout and flowing text.',
+                'No scripts, external styles, media, or forms.',
             )
-            self._wrapped = wrap_lines(lines, width)
+            document = getattr(page, 'layout', None)
+            self.layout_notice = ''
+            if self.layout_enabled and document is not None:
+                try:
+                    laid_out = render_layout(document, width)
+                    self._wrapped = [(line, index, 0, len(line)) for index, line in enumerate(laid_out)]
+                    self._search_lines = laid_out
+                except LayoutError:
+                    self.layout_notice = 'Complex layout: showing text.'
+                    if self.desktop.page == 'web':
+                        self.desktop.message = self.layout_notice
+                    self._wrapped = wrap_lines(lines, width)
+                    self._search_lines = lines
+            else:
+                self._wrapped = wrap_lines(lines, width)
+                self._search_lines = lines
             self._cached_wrap = key
+            self._collect_matches(self._search_lines, preserve=True)
+            if 0 <= self.match_index < len(self.matches):
+                index, position = self.matches[self.match_index]
+                count, _ = self._dimensions()
+                for row, (_, logical, start, end) in enumerate(self._wrapped):
+                    if logical == index and start <= position < end:
+                        if row < self.offset or row >= self.offset + count:
+                            self.offset = min(row, max(0, len(self._wrapped) - count))
+                        break
         return self._wrapped
 
     def _dimensions(self):
         height, width = self.desktop.screen.getmaxyx()
-        return max(1, height - 12), max(1, width - 6)
+        # The desktop pauses drawing below 60x16. Background page loads still
+        # reflow, so retain its minimum usable width rather than allocating
+        # one row per character while the terminal is temporarily tiny.
+        return max(1, height - 12), max(54, width - 6)
 
     def _max_offset(self):
         count, width = self._dimensions()
@@ -126,7 +158,7 @@ class WebBrowserView:
         address = self.browser.loading_url if self.browser.busy else page.url if page else '[no page]'
         self._draw(4, 'URL: ' + address)
         self._draw(5, ('Loading: ' + self.browser.loading_url if self.browser.busy else
-                       'Title: ' + (page.title or page.url) if page else 'Text-only web browser'), curses.A_BOLD)
+                       'Title: ' + (page.title or page.url) if page else 'ASCII web browser'), curses.A_BOLD)
         body = self._body(max(1, width - 6))
         count = max(1, height - 12)
         self.offset = min(self.offset, max(0, len(body) - count))
@@ -141,7 +173,9 @@ class WebBrowserView:
         else:
             self._draw(height - 6, 'No links on this page.' if page else 'Enter a URL to begin browsing.')
         self._draw(height - 5, 'G URL | Tab Link | Enter Open | Backspace Back | ] Fwd')
-        self._draw(height - 4, 'Arrows/Pg Scroll | R Reload | / Find | n Next | B Save')
+        mode = ('Layout' if self.layout_enabled and getattr(page, 'layout', None) is not None
+                and not self.layout_notice else 'Text')
+        self._draw(height - 4, f'L {mode} | R Reload | / Find | n Next | B Save')
 
     def _render_bookmarks(self, height, width):
         entries = self.bookmarks.entries
@@ -182,11 +216,16 @@ class WebBrowserView:
             self._start(lambda: self.browser.navigate(value))
 
     def _find_matches(self):
+        self._body(self._dimensions()[1])
+        self._collect_matches(self._search_lines)
+
+    def _collect_matches(self, lines, preserve=False):
+        previous = self.match_index
         self.matches, self.match_index = [], -1
         self.matches_truncated = False
         if self.query and self.browser.page:
             needle = ascii_text(self.query).lower()
-            for index, line in enumerate(self.browser.page.lines):
+            for index, line in enumerate(lines):
                 text = ascii_text(line.expandtabs(4)).lower()
                 start = 0
                 while True:
@@ -195,11 +234,16 @@ class WebBrowserView:
                         break
                     if len(self.matches) == MAX_FIND_MATCHES:
                         self.matches_truncated = True
+                        if preserve:
+                            self.match_index = min(previous, len(self.matches) - 1)
                         return
                     self.matches.append((index, found))
                     start = found + max(1, len(needle))
+        if preserve:
+            self.match_index = min(previous, len(self.matches) - 1)
 
     def _next_match(self):
+        self._body(self._dimensions()[1])
         if not self.query:
             self.desktop.message = 'Use / to find page text.'
             return
@@ -265,6 +309,12 @@ class WebBrowserView:
         elif key in ('x', 'X'):
             if self.browser.cancel():
                 self.desktop.message = 'Page load cancelled'
+        elif key in ('l', 'L') and not self.show_bookmarks:
+            self.layout_enabled = not self.layout_enabled
+            self.offset = 0
+            self._cached_wrap = None
+            self._body(self._dimensions()[1])
+            self.desktop.message = 'Layout: ASCII' if self.layout_enabled else 'Layout: Text'
         elif self.show_bookmarks:
             self._handle_bookmarks(key)
         elif key in (curses.KEY_BACKSPACE, '\x7f', '\b'):

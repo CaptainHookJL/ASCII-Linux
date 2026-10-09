@@ -19,6 +19,8 @@ from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 from urllib.request import (HTTPCookieProcessor, HTTPRedirectHandler,
                             HTTPSHandler, Request, build_opener)
 
+from .web_layout import LayoutNode, build_layout, document_size
+
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
 MAX_URL_LENGTH = 8192
@@ -135,6 +137,7 @@ class Page:
     title: str
     lines: tuple[str, ...]
     links: tuple[Link, ...] = ()
+    layout: LayoutNode | None = None
 
     @property
     def text(self):
@@ -145,7 +148,8 @@ class Page:
         # ASCII text costs one byte per character; URLs are encoded ASCII too.
         return (sum(len(line) + 1 for line in self.lines) + len(self.url)
                 + len(self.title)
-                + sum(len(link.url) + len(link.label) + 32 for link in self.links))
+                + sum(len(link.url) + len(link.label) + 32 for link in self.links)
+                + (document_size(self.layout) if self.layout is not None else 0))
 
 
 class _HTMLText(HTMLParser):
@@ -353,7 +357,9 @@ def render_html(content, url):
     try:
         parser.feed(content)
         parser.close()
-        return parser.page()
+        page = parser.page()
+        return Page(page.url, page.title, page.lines, page.links,
+                    build_layout(content, page.url, page.links))
     except (RecursionError, AssertionError) as error:
         raise BrowserError('This HTML page could not be read.') from error
 

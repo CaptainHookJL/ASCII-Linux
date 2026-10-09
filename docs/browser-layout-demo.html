@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ASCII Linux - Browser layout demo</title>
+  <style>
+    body { margin: 0; background: #eef1f6; color: #172238; font: 16px/1.5 sans-serif; }
+    header { background: #172238; color: #fff; padding: 24px; }
+    h1, h2, h3 { margin: 0 0 12px; }
+    nav { display: flex; gap: 16px; padding: 12px 24px; background: #dce5f3; }
+    a { color: #295da8; }
+    .content { display: grid; grid-template-columns: 1fr 3fr; gap: 16px; padding: 24px; }
+    aside { background: #fff; padding: 16px; border: 1px solid #cad4e4; }
+    main { background: #fff; padding: 20px; border: 1px solid #cad4e4; }
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    article { padding: 16px; border: 1px solid #cad4e4; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border: 1px solid #cad4e4; padding: 8px; text-align: left; }
+    footer { background: #172238; color: #fff; padding: 16px 24px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ASCII LINUX</h1>
+    <p>A text desktop. A web browser with character.</p>
+  </header>
+  <nav aria-label="Primary navigation">
+    <a href="browser-layout-demo.html">Home</a>
+    <a href="browser-layout-demo.html#features">Features</a>
+    <a href="browser-layout-demo.html#releases">Releases</a>
+    <a href="browser-layout-demo.html#about">About</a>
+  </nav>
+  <div class="content">
+    <aside>
+      <h2>QUICK LINKS</h2>
+      <ul>
+        <li><a href="browser-layout-demo.html#features">Browser features</a></li>
+        <li><a href="browser-layout-demo.html#releases">Release notes</a></li>
+        <li><a href="browser-layout-demo.html#about">About this demo</a></li>
+      </ul>
+      <h3>TRY THIS</h3>
+      <p>Resize the terminal, then press L to compare the layout and text views.</p>
+    </aside>
+    <main>
+      <h2>A website, drawn in text</h2>
+      <p>This page has a header, navigation, a sidebar and a main column. The ASCII
+        browser approximates that structure using spaces and character borders.</p>
+      <section id="features">
+        <h2>FEATURES</h2>
+        <div class="cards">
+          <article>
+            <h3>READ &amp; NAVIGATE</h3>
+            <p>Numbered links stay selectable with Tab and Enter. Search still
+              finds page text inside boxes.</p>
+          </article>
+          <article>
+            <h3>ADAPT TO SPACE</h3>
+            <p>Wide terminals show columns. Narrow terminals stack them so the
+              content remains readable.</p>
+          </article>
+        </div>
+      </section>
+      <section id="releases">
+        <h2>RELEASE CHECKLIST</h2>
+        <table>
+          <thead>
+            <tr><th>Area</th><th>Current behavior</th><th>Next check</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Desktop</td><td>ASCII interface</td><td>Boot the ISO</td></tr>
+            <tr><td>Browser</td><td>Text and layout views</td><td>Try more pages</td></tr>
+            <tr><td>Apps</td><td>Native graphical windows</td><td>Test Brave</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+  <footer id="about">
+    <p>ASCII Linux browser layout demo. HTML structure plus simple grid/flex
+      hints; colors and fonts are shown only in graphical browsers.</p>
+  </footer>
+</body>
+</html>

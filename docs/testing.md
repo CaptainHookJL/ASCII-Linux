@@ -83,7 +83,9 @@ For the ASCII browser, use W from the desktop or F1, and also test the standalon
 `python3 -m desktop.browser http://127.0.0.1:PORT/` command against a disposable
 local HTTP server. Use HTML containing headings, lists, relative links, entities,
 Unicode text, scripts and styles; visible controls and pages must remain ASCII,
-scripts/styles must not render or execute, and links must resolve correctly.
+script/style source must not appear as page text, scripts must not execute, and
+links must resolve correctly. Layout may use supported embedded/inline CSS hints;
+external stylesheets and image assets must not be fetched.
 Navigate with Tab/Enter, scroll and resize, then verify Backspace, forward (`]`),
 reload (`R`) and find (`/`, `N`). Follow a redirect and confirm subsequent relative
 links use its final URL. Plain text must display; HTTP failures, binary content
@@ -91,6 +93,39 @@ and a response over 2 MiB must report errors while retaining the current page.
 Use a delayed local response to check that the desktop still accepts input, X
 cancels, leaving the browser returns promptly, and a late result cannot replace
 a newer page. Keep an unsaved editor buffer across browser navigation.
+
+Use [browser-layout-demo.html](browser-layout-demo.html) to inspect the layout
+prototype with a local server. From the repository root, in one terminal run:
+
+```sh
+python3 -m http.server 8000 --bind 127.0.0.1 --directory docs
+```
+
+In another terminal run:
+
+```sh
+python3 -m desktop.browser http://127.0.0.1:8000/browser-layout-demo.html
+```
+
+At a wide terminal size, inspect the header and navigation row, sidebar next to
+main content, two cards and aligned table. Resize to 60 columns and check that
+columns stack and all text remains reachable by scrolling. Press L to switch
+to plain text and back; the server should receive no request for either toggle
+or a resize. Link numbers and destinations must stay the same in both views.
+Use Tab/Shift+Tab to select links within boxes and across columns, Enter to
+follow, and Backspace to return. Find text in the sidebar, a card and a table
+cell; the selected result must become visible after toggling modes or resizing.
+Search in layout matches within rendered rows; use L to search a phrase split
+across those rows in the flowing text view.
+Test a plain-text response too: layout mode must preserve its content without
+pretending it has HTML regions. Stop the disposable server with Ctrl+C afterward.
+
+The layout renderer approximates semantic HTML and basic embedded/inline CSS
+grid/flex hints. Verify unsupported rules degrade to readable content rather
+than expecting graphical-browser fidelity. Include nested regions, long words,
+missing end tags and oversized/deep structure in model checks. Continue to test
+body, history and parser limits so retaining layout structure cannot bypass
+the existing memory bounds.
 
 With a temporary HOME/XDG data directory, bookmark a loaded page with B, use M
 to open it, restart and check persistence without affecting real user bookmarks.
